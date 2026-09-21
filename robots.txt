@@ -1,0 +1,7 @@
+# robots.txt for https://thefastsatta.com/
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /admin-panel.html
+
+Sitemap: https://thefastsatta.com/sitemap.xml
