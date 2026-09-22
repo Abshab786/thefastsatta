@@ -1098,9 +1098,15 @@
             const yestM = yestIST.monthStr;
             const yestD = yestIST.dayStr;
 
+            // Dynamically assign order based on updated result times (resTime)
+            const marketsWithDynamicOrder = MARKET_LIST.map(m => {
+                const resM = getResMinutes(m.resTime || m.time);
+                return { ...m, resM };
+            }).sort((a, b) => a.resM - b.resM).map((m, idx) => ({ ...m, dynamicOrder: idx + 1 }));
+
             // Find max updatedAt timestamp among all declared markets today
             let newestDeclaredTimestamp = 0;
-            MARKET_LIST.forEach(m => {
+            marketsWithDynamicOrder.forEach(m => {
                 let data = appData[m.id] || {};
                 const hasExplicit = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
                 if (hasExplicit && (data.updatedAt || 0) > newestDeclaredTimestamp) {
@@ -1109,13 +1115,13 @@
             });
 
             // 1. Calculate market statuses & find active waiting market
-            const processedMarkets = MARKET_LIST.map(m => {
+            const processedMarkets = marketsWithDynamicOrder.map(m => {
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
 
                 const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
                 const yesterdayVal = fallbackYesterday || (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' ? data.yesterday : '---');
 
-                const resM = getResMinutes(m.resTime);
+                const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
                 const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
@@ -1166,20 +1172,20 @@
                 }
             }
 
-            const activeOrder = activeMarket ? activeMarket.order : 1;
+            const activeOrder = activeMarket ? activeMarket.dynamicOrder : 1;
 
-            // 2. Ladder Sort (Fresh Result / Active Market gets Position #1 Top!):
+            // 2. Continuous Dynamic Ladder Sort:
             const sortedMarkets = processedMarkets.map(m => {
-                let ladderIndex = 100 + m.order;
+                let ladderIndex = 100 + m.dynamicOrder;
 
                 if (m.isFreshNew) {
-                    ladderIndex = -100; // Position #1 Top Priority for 30 minutes!
-                } else if (m.order === activeOrder) {
+                    ladderIndex = -100; // Position #1 Top Priority for fresh result!
+                } else if (m.dynamicOrder === activeOrder) {
                     ladderIndex = 1; // Position #1 Top!
-                } else if (m.order < activeOrder) {
-                    ladderIndex = 1 + (activeOrder - m.order); // Shift right behind active market!
+                } else if (m.dynamicOrder < activeOrder) {
+                    ladderIndex = 1 + (activeOrder - m.dynamicOrder); // Shift right behind active market!
                 } else {
-                    ladderIndex = 100 + (m.order - activeOrder);
+                    ladderIndex = 100 + (m.dynamicOrder - activeOrder);
                 }
 
                 return { ...m, ladderIndex };
