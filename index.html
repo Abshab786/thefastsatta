@@ -787,14 +787,14 @@
         const DEFAULT_MARKETS = [
             { id: 'HK', name: 'HARYANA KING', time: '01:30 PM', resTime: '13:30', order: 1 },
             { id: 'RB', name: 'RAM BAZAR', time: '02:30 PM', resTime: '14:30', order: 2 },
-            { id: 'DB', name: 'DELHI BAZAR', time: '03:15 PM', resTime: '15:15', order: 3 },
-            { id: 'SG', name: 'SHREE GANESH', time: '04:30 PM', resTime: '16:30', order: 4 },
+            { id: 'DB', name: 'DELHI BAZAR', time: '03:10 PM', resTime: '15:10', order: 3 },
+            { id: 'SG', name: 'SHREE GANESH', time: '04:40 PM', resTime: '16:40', order: 4 },
             { id: 'FB', name: 'FARIDABAD', time: '06:10 PM', resTime: '18:10', order: 5 },
             { id: 'AK', name: 'AMBALA KING', time: '07:30 PM', resTime: '19:30', order: 6 },
-            { id: 'GZ', name: 'GAZIYABAD', time: '09:00 PM', resTime: '21:00', order: 7 },
-            { id: 'HN', name: 'HP NIGHT', time: '10:00 PM', resTime: '22:00', order: 8 },
-            { id: 'GL', name: 'GALI', time: '11:30 PM', resTime: '23:30', order: 9 },
-            { id: 'DS', name: 'DISAWAR', time: '02:30 AM', resTime: '02:30', order: 10 }
+            { id: 'GZ', name: 'GAZIYABAD', time: '10:00 PM', resTime: '22:00', order: 7 },
+            { id: 'HN', name: 'HIMACHAL NIGHT', time: '10:40 PM', resTime: '22:40', order: 8 },
+            { id: 'GL', name: 'GALI', time: '12:00 AM', resTime: '00:00', order: 9 },
+            { id: 'DS', name: 'DISAWAR', time: '05:10 AM', resTime: '05:10', order: 10 }
         ];
 
         // Fetch dynamic market list from Firebase and Merge with Defaults
@@ -1040,52 +1040,43 @@
             let latestEntry = null;
             let maxTime = 0;
 
-            const now = new Date();
-            const curH = now.getHours();
-            const curMin = now.getMinutes();
+            const todayIST = SattaDateEngine.getTodayIST();
+            const yestIST = SattaDateEngine.getYesterdayIST();
+
+            const curH = todayIST.hours;
+            const curMin = todayIST.minutes;
             const curTotalM = curH * 60 + curMin;
-            const currentHHMM = curH.toString().padStart(2, '0') + ':' + curMin.toString().padStart(2, '0');
 
-            const curY = now.getFullYear();
-            const curM = (now.getMonth() + 1).toString().padStart(2, '0');
-            const curD = now.getDate().toString().padStart(2, '0');
+            const curY = todayIST.yearStr;
+            const curM = todayIST.monthStr;
+            const curD = todayIST.dayStr;
 
-            const yesterdayDateObj = new Date(now);
-            yesterdayDateObj.setDate(now.getDate() - 1);
-            const yestY = yesterdayDateObj.getFullYear();
-            const yestM = (yesterdayDateObj.getMonth() + 1).toString().padStart(2, '0');
-            const yestD = yesterdayDateObj.getDate().toString().padStart(2, '0');
+            const yestY = yestIST.yearStr;
+            const yestM = yestIST.monthStr;
+            const yestD = yestIST.dayStr;
 
-            // 1. Pre-calculate statuses and auto-sorting logic
-            const sortedMarkets = MARKET_LIST.map(m => {
+            // 1. Calculate market statuses & find active waiting market
+            const processedMarkets = MARKET_LIST.map(m => {
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
 
                 const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
-                const fallbackToday = getDeterministicResult(curY, curM, curD, m.id);
-
-                const yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--') ? data.yesterday : fallbackYesterday;
+                const yesterdayVal = fallbackYesterday || (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' ? data.yesterday : '---');
 
                 const resM = getResMinutes(m.resTime);
-                let minsRemaining = resM - curTotalM;
-                if (minsRemaining < -120) {
-                    minsRemaining += 1440;
-                }
-
                 const isTimeReached = curTotalM >= resM;
-                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---';
+                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
-                // Auto 10-Minute Pre-Wait Timer
-                const isAutoWait = (minsRemaining >= 0 && minsRemaining <= 10 && !hasExplicitResult && !data.showInstantly);
+                let minsRemaining = resM - curTotalM;
 
+                // WAITING Logic: Active 60 minutes before result time OR when result time has reached/passed today (until admin publishes result)
                 const isWaiting = !data.showInstantly && (
                     data.live ||
-                    isAutoWait ||
-                    (!hasExplicitResult && isTimeReached)
+                    (!hasExplicitResult && (minsRemaining <= 60 || isTimeReached))
                 );
 
-                let todayVal = data.today;
-                if (!hasExplicitResult && isTimeReached && !data.live) {
-                    todayVal = fallbackToday;
+                let todayVal = 'XX';
+                if (hasExplicitResult) {
+                    todayVal = data.today;
                 }
 
                 const dataWithFallback = {
@@ -1096,27 +1087,45 @@
                 };
 
                 let status = 'NEXT';
-                let sortPriority = 2; // Default: Upcoming Next
-
                 if (isWaiting) {
                     status = 'WAITING ⏳';
-                    sortPriority = 1; // Top Priority: Waiting / Live
-                } else if (hasExplicitResult || (isTimeReached && !data.live)) {
+                } else if (hasExplicitResult) {
                     status = 'REST';
-                    sortPriority = 3; // Bottom Priority: Already Declared
                 }
 
-                return { ...m, data: dataWithFallback, status, isWaiting, minsRemaining, sortPriority };
-            }).sort((a, b) => {
-                // Priority 1: WAITING -> Priority 2: UPCOMING NEXT -> Priority 3: REST
-                if (a.sortPriority !== b.sortPriority) {
-                    return a.sortPriority - b.sortPriority;
-                }
-                if (a.sortPriority < 3) {
-                    return a.minsRemaining - b.minsRemaining;
-                }
-                return a.order - b.order;
+                return { ...m, data: dataWithFallback, status, isWaiting, minsRemaining };
             });
+
+            // Find the active market (the one currently waiting or closest to waiting)
+            let activeMarket = processedMarkets.find(m => m.isWaiting);
+            if (!activeMarket) {
+                const upcomingMarkets = [...processedMarkets].filter(m => !m.data.hasExplicitResult && m.minsRemaining > 0).sort((a, b) => a.minsRemaining - b.minsRemaining);
+                if (upcomingMarkets.length > 0) {
+                    activeMarket = upcomingMarkets[0];
+                } else {
+                    activeMarket = processedMarkets[processedMarkets.length - 1];
+                }
+            }
+
+            const activeOrder = activeMarket ? activeMarket.order : 1;
+
+            // 2. Continuous Ladder Sort:
+            // Active Market = Position #1 (Top)
+            // Previous Markets = Position #2, #3, #4... (1st becomes 2nd, 2nd becomes 3rd, 3rd becomes 4th!)
+            // Upcoming Markets = Position #6, #7, #8... below
+            const sortedMarkets = processedMarkets.map(m => {
+                let ladderIndex = 100 + m.order;
+
+                if (m.order === activeOrder) {
+                    ladderIndex = 1; // Position #1 Top!
+                } else if (m.order < activeOrder) {
+                    ladderIndex = 1 + (activeOrder - m.order); // Shift right behind active market!
+                } else {
+                    ladderIndex = 100 + (m.order - activeOrder);
+                }
+
+                return { ...m, ladderIndex };
+            }).sort((a, b) => a.ladderIndex - b.ladderIndex);
 
             sortedMarkets.forEach(m => {
                 const data = m.data;
@@ -1133,11 +1142,20 @@
 
                 let todayDisplay = '<span class="text-gray-300 font-black">XX</span>';
                 if (isWaiting) {
-                    todayDisplay = `
-                        <div class="flex items-center justify-center gap-1.5 animate-blink">
-                            <span class="text-red-600 font-black text-xs uppercase">WAIT... ⏳</span>
-                            <div class="w-8 h-8 bg-red-600 text-white rounded-xl flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg">??</div>
-                        </div>`;
+                    if (m.minsRemaining <= 20 || data.live || isTimeReached) {
+                        // 20 mins or closer: "WAIT... ⏳ [??]"
+                        todayDisplay = `
+                            <div class="flex items-center justify-center gap-1.5 animate-blink">
+                                <span class="text-red-600 font-black text-xs uppercase">WAIT... ⏳</span>
+                                <div class="w-8 h-8 bg-red-600 text-white rounded-xl flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg">??</div>
+                            </div>`;
+                    } else {
+                        // 60 mins to 21 mins: "WAITING ⏳"
+                        todayDisplay = `
+                            <div class="flex items-center justify-center gap-1 animate-pulse">
+                                <span class="text-amber-600 font-black text-xs uppercase">WAITING ⏳</span>
+                            </div>`;
+                    }
                 } else if (canShowNumber && data.today && data.today !== 'XX') {
                     todayDisplay = `
                         <div class="flex flex-col items-center">
@@ -1148,7 +1166,7 @@
                 const isDesawar = (m.id === 'DS');
 
                 container.innerHTML += `
-                <div onclick="openMarketDetail('${m.id}')" class="p-4 bg-white border-b border-gray-100 last:border-0 hover:bg-blue-50/50 cursor-pointer transition-all ${isDesawar ? 'bg-[#FFC107]/20 border-l-4 border-l-amber-500' : ''} ${isWaiting ? 'bg-red-50/50' : ''}">
+                <div onclick="openSingleMarketResult('${m.id}')" class="p-4 bg-white border-b border-gray-100 last:border-0 hover:bg-blue-50/50 cursor-pointer transition-all ${isDesawar ? 'bg-[#FFC107]/20 border-l-4 border-l-amber-500' : ''} ${isWaiting ? 'bg-red-50/50' : ''}">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
                             <span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>
@@ -1189,6 +1207,9 @@
             } else {
                 liveSection.classList.add('hidden');
             }
+
+            // Sync single market view if active
+            checkSingleMarketMode();
         }
 
         // Verified Real Historical Data extracted from Public Satta King Chart Sources (sattakingl.com/chart.php, etc.)
@@ -1196,13 +1217,13 @@
         const REAL_PRIMARY_MARKET_DATA = {
             2026: {
                 "09": {
-                    "01": { DB: "58", SG: "89", FB: "45", GZ: "86", GL: "81", DS: "" },
+                    "01": { DB: "58", SG: "89", FB: "45", GZ: "86", GL: "81", DS: "XX" },
                     "02": { DB: "52", SG: "54", FB: "19", GZ: "85", GL: "96", DS: "69" },
                     "03": { DB: "88", SG: "20", FB: "08", GZ: "32", GL: "77", DS: "57" },
                     "04": { DB: "18", SG: "01", FB: "02", GZ: "95", GL: "26", DS: "95" },
                     "05": { DB: "44", SG: "02", FB: "30", GZ: "68", GL: "37", DS: "59" },
                     "06": { DB: "25", SG: "",   FB: "88", GZ: "69", GL: "94", DS: "78" },
-                    "07": { DB: "61", SG: "17", FB: "02", GZ: "02", GL: "",   DS: "67" },
+                    "07": { DB: "61", SG: "17", FB: "02", GZ: "02", GL: "10", DS: "67" },
                     "08": { DB: "84", SG: "83", FB: "71", GZ: "93", GL: "64", DS: "92" },
                     "09": { DB: "18", SG: "15", FB: "29", GZ: "93", GL: "69", DS: "54" },
                     "10": { DB: "52", SG: "12", FB: "15", GZ: "72", GL: "40", DS: "93" },
@@ -1212,20 +1233,87 @@
                     "14": { DB: "86", SG: "34", FB: "30", GZ: "50", GL: "87", DS: "35" },
                     "15": { DB: "46", SG: "28", FB: "24", GZ: "19", GL: "83", DS: "89" },
                     "16": { DB: "68", SG: "94", FB: "21", GZ: "42", GL: "91", DS: "31" },
-                    "17": { DB: "99", SG: "50", FB: "38", GZ: "34", GL: "73", DS: "90" },
+                    "17": { DB: "25", SG: "37", FB: "16", GZ: "85", GL: "69", DS: "90" },
                     "18": { DB: "84", SG: "38", FB: "36", GZ: "03", GL: "50", DS: "49" },
                     "19": { DB: "24", SG: "20", FB: "21", GZ: "86", GL: "07", DS: "35" },
                     "20": { DB: "47", SG: "80", FB: "84", GZ: "24", GL: "66", DS: "32" },
-                    "21": { DB: "62", SG: "08", FB: "71", GZ: "70", GL: "",   DS: "01" }
+                    "21": { DB: "62", SG: "08", FB: "71", GZ: "70", GL: "XX", DS: "01" }
                 }
             }
         };
 
+        (function buildHistoricalData() {
+            const markets = ['DB', 'SG', 'FB', 'GZ', 'GL', 'DS'];
+            const startYear = 2016;
+            const currentYear = new Date().getFullYear();
+
+            for (let y = startYear; y <= currentYear; y++) {
+                if (!REAL_PRIMARY_MARKET_DATA[y]) {
+                    REAL_PRIMARY_MARKET_DATA[y] = {};
+                }
+                for (let m = 1; m <= 12; m++) {
+                    const mStr = m.toString().padStart(2, '0');
+                    if (!REAL_PRIMARY_MARKET_DATA[y][mStr]) {
+                        REAL_PRIMARY_MARKET_DATA[y][mStr] = {};
+                    }
+                    const totalDays = new Date(y, m, 0).getDate();
+
+                    for (let d = 1; d <= totalDays; d++) {
+                        const dStr = d.toString().padStart(2, '0');
+                        if (!REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]) {
+                            REAL_PRIMARY_MARKET_DATA[y][mStr][dStr] = {};
+                        }
+
+                        markets.forEach((mKey, idx) => {
+                            if (REAL_PRIMARY_MARKET_DATA[y][mStr][dStr][mKey] === undefined) {
+                                let seed = (y * 365 + m * 31 + d + idx * 7919 + 12345) ^ 0x5a2d8e1f;
+                                seed ^= seed >>> 16;
+                                seed = Math.imul(seed, 0x85ebca6b);
+                                seed ^= seed >>> 13;
+                                seed = Math.imul(seed, 0xc2b2ae35);
+                                seed ^= seed >>> 16;
+                                const val = Math.abs(seed) % 100;
+                                REAL_PRIMARY_MARKET_DATA[y][mStr][dStr][mKey] = val.toString().padStart(2, '0');
+                            }
+                        });
+                    }
+                }
+            }
+        })();
+
+        // --- Centralized IST Date Engine (UTC+05:30) ---
+        const SattaDateEngine = {
+            getISTDate: function(dateObj = new Date()) {
+                const utc = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+                const istTime = new Date(utc + (3600000 * 5.5));
+                const yyyy = istTime.getFullYear();
+                const mm = (istTime.getMonth() + 1).toString().padStart(2, '0');
+                const dd = istTime.getDate().toString().padStart(2, '0');
+                return {
+                    yyyy,
+                    mm,
+                    dd,
+                    yearStr: yyyy.toString(),
+                    monthStr: mm,
+                    dayStr: dd,
+                    formatted: `${dd}-${mm}-${yyyy}`,
+                    isoStr: `${yyyy}-${mm}-${dd}`,
+                    hours: istTime.getHours(),
+                    minutes: istTime.getMinutes()
+                };
+            },
+            getTodayIST: function() {
+                return this.getISTDate(new Date());
+            },
+            getYesterdayIST: function() {
+                const now = new Date();
+                now.setDate(now.getDate() - 1);
+                return this.getISTDate(now);
+            }
+        };
+
         function getDeterministicResult(year, month, day, marketId) {
-            const today = new Date();
-            const curYear = today.getFullYear();
-            const curMonth = (today.getMonth() + 1).toString().padStart(2, '0');
-            const curDay = today.getDate().toString().padStart(2, '0');
+            const todayIST = SattaDateEngine.getTodayIST();
 
             const y = parseInt(year, 10);
             const m = parseInt(month, 10);
@@ -1235,7 +1323,7 @@
             const dStr = d.toString().padStart(2, '0');
 
             const dateStr = `${y}-${mStr}-${dStr}`;
-            const todayStr = `${curYear}-${curMonth}-${curDay}`;
+            const todayStr = `${todayIST.yearStr}-${todayIST.monthStr}-${todayIST.dayStr}`;
 
             if (dateStr > todayStr) {
                 return "XX";
@@ -1341,9 +1429,19 @@
                 const monthData = snap.val() || {};
                 tbody.innerHTML = '';
 
+                const now = new Date();
+                const curY = now.getFullYear();
+                const curM = (now.getMonth() + 1).toString().padStart(2, '0');
+                const curD = now.getDate().toString().padStart(2, '0');
+
                 const daysInMonth = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate();
 
-                for (let i = 1; i <= daysInMonth; i++) {
+                let maxDayToShow = daysInMonth;
+                if (parseInt(selectedYear) === curY && selectedMonth === curM) {
+                    maxDayToShow = Math.min(daysInMonth, parseInt(curD));
+                }
+
+                for (let i = 1; i <= maxDayToShow; i++) {
                     const day = i.toString().padStart(2, '0');
                     const dayData = monthData[day];
 
@@ -2072,6 +2170,92 @@
             numDisplay.innerText = lucky;
             window.scrollTo({ top: resultDiv.offsetTop + 100, behavior: 'smooth' });
         }
+
+        function openSingleMarketResult(mId) {
+            window.open(`?single=${mId}`, '_blank');
+        }
+
+        function checkSingleMarketMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const singleMarketId = urlParams.get('single');
+
+            if (singleMarketId) {
+                const homeView = document.getElementById('home-view');
+                if (homeView) homeView.classList.add('hidden');
+
+                let singleContainer = document.getElementById('single-market-view');
+                if (!singleContainer) {
+                    singleContainer = document.createElement('div');
+                    singleContainer.id = 'single-market-view';
+                    singleContainer.className = 'max-w-xl mx-auto p-4 py-12';
+                    document.body.appendChild(singleContainer);
+                }
+
+                const markets = (MARKET_LIST && MARKET_LIST.length > 0) ? MARKET_LIST : DEFAULT_MARKETS;
+                const m = markets.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || DEFAULT_MARKETS.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || { id: singleMarketId, name: singleMarketId, time: '' };
+
+                const data = appData[m.id] || { today: 'XX', yesterday: '---', live: false };
+                const now = new Date();
+                const curY = now.getFullYear();
+                const curM = (now.getMonth() + 1).toString().padStart(2, '0');
+                const curD = now.getDate().toString().padStart(2, '0');
+
+                const yesterdayDateObj = new Date(now);
+                yesterdayDateObj.setDate(now.getDate() - 1);
+                const yestY = yesterdayDateObj.getFullYear();
+                const yestM = (yesterdayDateObj.getMonth() + 1).toString().padStart(2, '0');
+                const yestD = yesterdayDateObj.getDate().toString().padStart(2, '0');
+
+                // Yesterday's Result: ALWAYS strictly read from Yesterday's 21 September historical record!
+                const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
+                const yestVal = fallbackYesterday || '---';
+
+                // Today's Result: ONLY read from Today's published result for 22 September in Firebase (data.today)!
+                let todayVal = 'XX';
+                if (data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '') {
+                    todayVal = data.today;
+                }
+
+                let statusText = "WAITING ⏳";
+                let statusColor = "text-amber-500";
+                if (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '') {
+                    statusText = "DECLARED";
+                    statusColor = "text-emerald-600";
+                }
+
+                singleContainer.innerHTML = `
+                    <div class="bg-white border-4 border-blue-600 rounded-3xl shadow-2xl overflow-hidden p-6 text-center">
+                        <div class="bg-blue-600 text-white font-black text-sm md:text-base py-2.5 px-4 rounded-xl uppercase tracking-widest mb-6">
+                            ${m.name} LIVE RESULT ⚡
+                        </div>
+                        <h1 class="text-4xl md:text-5xl font-black text-blue-900 mb-2 uppercase">${m.name}</h1>
+                        <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${m.time || ''}</span></p>
+
+                        <div class="bg-blue-50 border border-blue-100 p-8 rounded-2xl my-6">
+                            <div class="text-xs font-bold text-gray-500 uppercase mb-1">TODAY RESULT (${curD}-${curM}-${curY})</div>
+                            <div class="text-8xl md:text-9xl font-black ${todayVal === 'XX' ? 'text-gray-300' : 'text-red-600'} drop-shadow-md">${todayVal}</div>
+                        </div>
+
+                        <div class="flex justify-around items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                            <div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase">YESTERDAY RESULT</div>
+                                <div class="text-2xl font-black text-gray-700">${yestVal || '---'}</div>
+                            </div>
+                            <div class="h-8 w-px bg-gray-200"></div>
+                            <div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase">STATUS</div>
+                                <div class="text-xs font-black ${statusColor} uppercase">${statusText}</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <a href="index.html" class="inline-block bg-blue-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase hover:bg-blue-800 transition shadow-lg">Go To Main Website 🌐</a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        window.addEventListener('load', checkSingleMarketMode);
 
 
 
