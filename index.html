@@ -834,10 +834,21 @@
         db.ref('settings/markets').on('value', (snap) => {
             const cloudData = snap.val() || {};
             MARKET_LIST = DEFAULT_MARKETS.map(m => {
+                let name = m.name;
+                let time = m.time;
+                let resTime = m.resTime;
+
+                // Hard-fix static names to prevent any Firebase inversion/swap
+                if (m.id === 'SG') name = 'SHREE GANESH';
+                else if (m.id === 'HN') name = 'HIMACHAL NIGHT';
+                else if (cloudData[m.id] && cloudData[m.id].name) name = cloudData[m.id].name;
+
                 if (cloudData[m.id]) {
-                    return { ...m, ...cloudData[m.id] };
+                    time = cloudData[m.id].time || m.time;
+                    resTime = cloudData[m.id].resTime || m.resTime;
                 }
-                return m;
+
+                return { ...m, name, time, resTime };
             }).sort((a, b) => a.order - b.order);
             renderResults();
         });
@@ -1239,12 +1250,14 @@
                     cardBgClass = 'bg-red-50/50 border-b border-gray-100';
                 }
 
+                const marketTitleName = (DEFAULT_MARKETS.find(def => def.id === m.id) || m).name;
+
                 container.innerHTML += `
                 <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
                             <span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>
-                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${m.name} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
+                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
                         </div>
                         <div class="text-[10px] font-bold text-gray-400 uppercase">${m.time}</div>
                     </div>
@@ -2306,10 +2319,10 @@
                     document.body.appendChild(singleContainer);
                 }
 
-                const markets = (MARKET_LIST && MARKET_LIST.length > 0) ? MARKET_LIST : DEFAULT_MARKETS;
-                const m = markets.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || DEFAULT_MARKETS.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || { id: singleMarketId, name: singleMarketId, time: '' };
+                const mDef = DEFAULT_MARKETS.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || { id: singleMarketId, name: singleMarketId, time: '' };
+                const marketTitleName = mDef.name;
 
-                const data = appData[m.id] || { today: 'XX', yesterday: '---', live: false };
+                const data = appData[mDef.id] || { today: 'XX', yesterday: '---', live: false };
                 const todayIST = SattaDateEngine.getTodayIST();
                 const yestIST = SattaDateEngine.getYesterdayIST();
 
@@ -2326,10 +2339,10 @@
                 const yestD = yestIST.dayStr;
 
                 // Yesterday's Result: ALWAYS strictly read from Yesterday's historical record!
-                const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
+                const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, mDef.id);
                 const yestVal = fallbackYesterday || '---';
 
-                const resM = getResMinutes(m.time || m.resTime);
+                const resM = getResMinutes(mDef.time || mDef.resTime);
                 const isTimeReached = curTotalM >= resM;
                 const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
@@ -2354,10 +2367,10 @@
                 singleContainer.innerHTML = `
                     <div class="bg-white border-4 border-blue-600 rounded-3xl shadow-2xl overflow-hidden p-6 text-center">
                         <div class="bg-blue-600 text-white font-black text-sm md:text-base py-2.5 px-4 rounded-xl uppercase tracking-widest mb-6">
-                            ${m.name} LIVE RESULT ⚡
+                            ${marketTitleName} LIVE RESULT ⚡
                         </div>
-                        <h1 class="text-4xl md:text-5xl font-black text-blue-900 mb-2 uppercase">${m.name}</h1>
-                        <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${m.time || ''}</span></p>
+                        <h1 class="text-4xl md:text-5xl font-black text-blue-900 mb-2 uppercase">${marketTitleName}</h1>
+                        <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${mDef.time || ''}</span></p>
 
                         <div class="bg-blue-50 border border-blue-100 p-8 rounded-2xl my-6">
                             <div class="text-xs font-bold text-gray-500 uppercase mb-1">TODAY RESULT (${curD}-${curM}-${curY})</div>
