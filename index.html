@@ -329,6 +329,34 @@
             <div class="max-w-5xl mx-auto m-2 bg-red-600 p-2 text-[10px] md:text-xs leading-tight text-white font-medium text-center satta-border rounded-lg">
                 DISCLAIMER: This website is an independent media portal for informational purposes only. We do not promote or encourage gambling. Users must be 18+. Use at your own risk.
             </div>
+
+            <!-- Official WhatsApp Channel Join Card -->
+            <div class="max-w-5xl mx-auto my-4 px-2">
+                <div class="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 p-1 rounded-3xl shadow-2xl border-2 border-emerald-400">
+                    <div class="bg-slate-900 rounded-[22px] p-5 md:p-6 text-white text-center relative overflow-hidden">
+                        <div class="absolute -right-8 -top-8 w-28 h-28 bg-emerald-500/20 rounded-full blur-2xl"></div>
+
+                        <div class="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] md:text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-widest mb-3 animate-pulse">
+                            📢 Official WhatsApp Channel
+                        </div>
+
+                        <h2 class="text-2xl md:text-4xl font-black italic tracking-tight text-white mb-2 uppercase">
+                            Join Fast Satta Official WhatsApp Channel 🟢
+                        </h2>
+
+                        <p class="text-gray-300 text-xs md:text-sm font-bold max-w-xl mx-auto mb-5 leading-relaxed">
+                            सबसे तेज़ लाइव रिजल्ट, लीक जोड़ियाँ और डेली सॉलिड हरूफ पाने के लिए हमारे ऑफिसियल व्हाट्सएप चैनल को अभी फॉलो करें!
+                        </p>
+
+                        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                            <a href="https://whatsapp.com/channel/0029VbDat2N6xCSOVlTMCn1b" target="_blank" class="wa-link w-full sm:w-auto flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#1fb355] text-white px-8 py-4 rounded-2xl font-black text-base md:text-lg shadow-xl hover:scale-105 active:scale-95 transition-all border-2 border-white">
+                                <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.885 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                                FOLLOW ON WHATSAPP CHANNEL
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main class="max-w-5xl mx-auto px-4 py-6">
@@ -937,13 +965,13 @@
 
             // 1. Links Management (Force update all WhatsApp and Telegram links & show/hide)
             function formatLink(url, fallback) {
-                if (!url || url.trim() === "" || url === "#") return fallback;
+                if (!url || url.trim() === "" || url === "#" || url.includes('wa.me/910000000000')) return fallback;
                 let cleanUrl = url.trim();
                 if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
                 return cleanUrl;
             }
 
-            const waUrl = formatLink(settings.waLink, "https://wa.me/910000000000");
+            const waUrl = formatLink(settings.waLink, "https://whatsapp.com/channel/0029VbDat2N6xCSOVlTMCn1b");
             const tgUrl = formatLink(settings.tgLink, "https://t.me/thefastsatta");
 
             const showWa = (settings.showWa !== undefined) ? settings.showWa : true;
@@ -1055,6 +1083,16 @@
             const yestM = yestIST.monthStr;
             const yestD = yestIST.dayStr;
 
+            // Find max updatedAt timestamp among all declared markets today
+            let newestDeclaredTimestamp = 0;
+            MARKET_LIST.forEach(m => {
+                let data = appData[m.id] || {};
+                const hasExplicit = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                if (hasExplicit && (data.updatedAt || 0) > newestDeclaredTimestamp) {
+                    newestDeclaredTimestamp = data.updatedAt;
+                }
+            });
+
             // 1. Calculate market statuses & find active waiting market
             const processedMarkets = MARKET_LIST.map(m => {
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
@@ -1074,6 +1112,9 @@
                     (!hasExplicitResult && (minsRemaining <= 60 || isTimeReached))
                 );
 
+                // Fresh New Result: Keeps 'NEW ⚡' badge UNTIL the next market's result is published!
+                const isFreshNew = hasExplicitResult && newestDeclaredTimestamp > 0 && (data.updatedAt || 0) === newestDeclaredTimestamp;
+
                 let todayVal = 'XX';
                 if (hasExplicitResult) {
                     todayVal = data.today;
@@ -1083,21 +1124,24 @@
                     ...data,
                     yesterday: yesterdayVal,
                     today: todayVal,
-                    hasExplicitResult
+                    hasExplicitResult,
+                    isFreshNew
                 };
 
                 let status = 'NEXT';
-                if (isWaiting) {
+                if (isFreshNew) {
+                    status = 'NEW ⚡';
+                } else if (isWaiting) {
                     status = 'WAITING ⏳';
                 } else if (hasExplicitResult) {
                     status = 'REST';
                 }
 
-                return { ...m, data: dataWithFallback, status, isWaiting, minsRemaining };
+                return { ...m, data: dataWithFallback, status, isWaiting, isFreshNew, minsRemaining };
             });
 
-            // Find the active market (the one currently waiting or closest to waiting)
-            let activeMarket = processedMarkets.find(m => m.isWaiting);
+            // Find the active market (fresh result OR waiting market)
+            let activeMarket = processedMarkets.find(m => m.isFreshNew || m.isWaiting);
             if (!activeMarket) {
                 const upcomingMarkets = [...processedMarkets].filter(m => !m.data.hasExplicitResult && m.minsRemaining > 0).sort((a, b) => a.minsRemaining - b.minsRemaining);
                 if (upcomingMarkets.length > 0) {
@@ -1109,14 +1153,13 @@
 
             const activeOrder = activeMarket ? activeMarket.order : 1;
 
-            // 2. Continuous Ladder Sort:
-            // Active Market = Position #1 (Top)
-            // Previous Markets = Position #2, #3, #4... (1st becomes 2nd, 2nd becomes 3rd, 3rd becomes 4th!)
-            // Upcoming Markets = Position #6, #7, #8... below
+            // 2. Ladder Sort (Fresh Result / Active Market gets Position #1 Top!):
             const sortedMarkets = processedMarkets.map(m => {
                 let ladderIndex = 100 + m.order;
 
-                if (m.order === activeOrder) {
+                if (m.isFreshNew) {
+                    ladderIndex = -100; // Position #1 Top Priority for 30 minutes!
+                } else if (m.order === activeOrder) {
                     ladderIndex = 1; // Position #1 Top!
                 } else if (m.order < activeOrder) {
                     ladderIndex = 1 + (activeOrder - m.order); // Shift right behind active market!
@@ -1131,6 +1174,7 @@
                 const data = m.data;
                 const isTimeReached = curTotalM >= getResMinutes(m.resTime);
                 const isWaiting = m.isWaiting;
+                const isFreshNew = m.isFreshNew;
                 const canShowNumber = data.showInstantly || isTimeReached || (!data.live && data.hasExplicitResult);
 
                 if (data.updatedAt > maxTime) {
@@ -1138,7 +1182,7 @@
                     latestEntry = { name: m.name, today: data.today, live: data.live, updatedAt: data.updatedAt, showInstantly: data.showInstantly };
                 }
 
-                let labelClass = isWaiting ? 'bg-red-600 animate-blink' : (m.status === 'REST' ? 'bg-gray-500' : 'bg-amber-500');
+                let labelClass = isFreshNew ? 'bg-emerald-600 animate-bounce' : (isWaiting ? 'bg-red-600 animate-blink' : (m.status === 'REST' ? 'bg-gray-500' : 'bg-amber-500'));
 
                 let todayDisplay = '<span class="text-gray-300 font-black">XX</span>';
                 if (isWaiting) {
@@ -1159,14 +1203,23 @@
                 } else if (canShowNumber && data.today && data.today !== 'XX') {
                     todayDisplay = `
                         <div class="flex flex-col items-center">
-                            <span class="text-blue-900 text-3xl font-black">${data.today}</span>
+                            <span class="${isFreshNew ? 'text-emerald-700 text-4xl' : 'text-blue-900 text-3xl'} font-black">${data.today}</span>
                         </div>`;
                 }
 
                 const isDesawar = (m.id === 'DS');
+                let cardBgClass = 'bg-white border-b border-gray-100';
+                if (isFreshNew) {
+                    // Light Yellow Card Box Highlight for 30 Minutes!
+                    cardBgClass = 'bg-amber-100/90 border-2 border-amber-400 shadow-md my-1 rounded-xl';
+                } else if (isDesawar) {
+                    cardBgClass = 'bg-[#FFC107]/20 border-l-4 border-l-amber-500 border-b border-gray-100';
+                } else if (isWaiting) {
+                    cardBgClass = 'bg-red-50/50 border-b border-gray-100';
+                }
 
                 container.innerHTML += `
-                <div onclick="openSingleMarketResult('${m.id}')" class="p-4 bg-white border-b border-gray-100 last:border-0 hover:bg-blue-50/50 cursor-pointer transition-all ${isDesawar ? 'bg-[#FFC107]/20 border-l-4 border-l-amber-500' : ''} ${isWaiting ? 'bg-red-50/50' : ''}">
+                <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
                             <span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>
@@ -1825,7 +1878,7 @@
 
                         <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 text-xs font-mono text-gray-600 space-y-1">
                             <div><strong>Verified Entity:</strong> THEFASTSATTA.COM</div>
-                            <div><strong>Official Contact:</strong> thefastsatta@gmail.com</div>
+                            <div><strong>Official Contact:</strong> support@thefastsatta.com</div>
                             <div><strong>Governing Jurisdiction:</strong> Courts of Mumbai, Maharashtra, India</div>
                         </div>
                     </div>`;
@@ -1959,7 +2012,7 @@
 
                         <section>
                             <h3 class="text-base font-black text-blue-900 mb-1">25. Contact Information</h3>
-                            <p>For inquiries regarding these Terms, contact: thefastsatta@gmail.com.</p>
+                            <p>For inquiries regarding these Terms, contact: support@thefastsatta.com.</p>
                         </section>
                     </div>`;
             } else if (page === 'privacy') {
@@ -2017,7 +2070,7 @@
 
                         <section>
                             <h3 class="text-base font-black text-blue-900 mb-1">8. User Rights & Inquiries</h3>
-                            <p>Users have the right to clear local browser storage at any time. For privacy inquiries, contact: thefastsatta@gmail.com.</p>
+                            <p>Users have the right to clear local browser storage at any time. For privacy inquiries, contact: support@thefastsatta.com.</p>
                         </section>
                     </div>`;
             } else if (page === 'cookie') {
@@ -2086,7 +2139,7 @@
 
                         <section>
                             <h3 class="text-base font-black text-blue-900 mb-1">4. Designated DMCA Agent Contact</h3>
-                            <p>Submit copyright notices to: thefastsatta@gmail.com.</p>
+                            <p>Submit copyright notices to: support@thefastsatta.com.</p>
                         </section>
                     </div>`;
             } else if (page === 'contact') {
@@ -2103,7 +2156,7 @@
                         </section>
 
                         <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-3 font-mono text-xs">
-                            <div><strong>Official Email:</strong> thefastsatta@gmail.com</div>
+                            <div><strong>Official Email:</strong> support@thefastsatta.com</div>
                             <div><strong>Location / Address:</strong> Mumbai Zone, Maharashtra, India</div>
                             <div><strong>Response Timeframe:</strong> Business inquiries are acknowledged within 48 business hours.</div>
                         </div>
@@ -2195,24 +2248,34 @@
                 const m = markets.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || DEFAULT_MARKETS.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || { id: singleMarketId, name: singleMarketId, time: '' };
 
                 const data = appData[m.id] || { today: 'XX', yesterday: '---', live: false };
-                const now = new Date();
-                const curY = now.getFullYear();
-                const curM = (now.getMonth() + 1).toString().padStart(2, '0');
-                const curD = now.getDate().toString().padStart(2, '0');
+                const todayIST = SattaDateEngine.getTodayIST();
+                const yestIST = SattaDateEngine.getYesterdayIST();
 
-                const yesterdayDateObj = new Date(now);
-                yesterdayDateObj.setDate(now.getDate() - 1);
-                const yestY = yesterdayDateObj.getFullYear();
-                const yestM = (yesterdayDateObj.getMonth() + 1).toString().padStart(2, '0');
-                const yestD = yesterdayDateObj.getDate().toString().padStart(2, '0');
+                const curH = todayIST.hours;
+                const curMin = todayIST.minutes;
+                const curTotalM = curH * 60 + curMin;
 
-                // Yesterday's Result: ALWAYS strictly read from Yesterday's 21 September historical record!
+                const curY = todayIST.yearStr;
+                const curM = todayIST.monthStr;
+                const curD = todayIST.dayStr;
+
+                const yestY = yestIST.yearStr;
+                const yestM = yestIST.monthStr;
+                const yestD = yestIST.dayStr;
+
+                // Yesterday's Result: ALWAYS strictly read from Yesterday's historical record!
                 const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
                 const yestVal = fallbackYesterday || '---';
 
-                // Today's Result: ONLY read from Today's published result for 22 September in Firebase (data.today)!
+                const resM = getResMinutes(m.time || m.resTime);
+                const isTimeReached = curTotalM >= resM;
+                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+
+                // SHOW INSTANTLY or TIME REACHED check
+                const canShowNumber = data.showInstantly || isTimeReached || (!data.live && hasExplicitResult);
+
                 let todayVal = 'XX';
-                if (data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '') {
+                if (canShowNumber && hasExplicitResult) {
                     todayVal = data.today;
                 }
 
@@ -2221,6 +2284,9 @@
                 if (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '') {
                     statusText = "DECLARED";
                     statusColor = "text-emerald-600";
+                } else if (data.live || isTimeReached) {
+                    statusText = "LIVE WAIT... ⏳";
+                    statusColor = "text-red-600 animate-pulse";
                 }
 
                 singleContainer.innerHTML = `
