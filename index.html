@@ -854,6 +854,7 @@
                 let time = m.time;
                 let resTime = m.resTime;
                 let isPinned = false;
+                let position = 0;
                 let badge = 'AUTO';
 
                 // Hard-fix static names to prevent any Firebase inversion/swap
@@ -865,10 +866,11 @@
                     time = cloudData[m.id].time || m.time;
                     resTime = cloudData[m.id].resTime || m.resTime;
                     isPinned = cloudData[m.id].isPinned || false;
+                    position = parseInt(cloudData[m.id].position || (isPinned ? 1 : 0), 10) || 0;
                     badge = cloudData[m.id].badge || 'AUTO';
                 }
 
-                return { ...m, name, time, resTime, isPinned, badge };
+                return { ...m, name, time, resTime, isPinned, position, badge };
             }).sort((a, b) => a.order - b.order);
             renderResults();
         });
@@ -1147,9 +1149,10 @@
 
             // 1. Calculate market statuses & find active waiting market
             const processedMarkets = marketsWithDynamicOrder.map(m => {
-                let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false, isPinned: false, badge: 'AUTO' };
+                let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false, isPinned: false, position: 0, badge: 'AUTO' };
 
-                const isPinned = (m.isPinned !== undefined && m.isPinned) || data.isPinned || false;
+                const position = parseInt(m.position !== undefined && m.position > 0 ? m.position : (data.position || 0), 10) || 0;
+                const isPinned = (position > 0) || (m.isPinned !== undefined && m.isPinned) || data.isPinned || false;
                 const customBadge = (m.badge && m.badge !== 'AUTO' ? m.badge : (data.badge && data.badge !== 'AUTO' ? data.badge : 'AUTO'));
 
                 // Check if data.updatedAt was published on TODAY's IST date
@@ -1196,7 +1199,7 @@
                     isFreshNew
                 };
 
-                return { ...m, data: dataWithFallback, isWaiting, isFreshNew, minsRemaining, isPinned, customBadge };
+                return { ...m, data: dataWithFallback, isWaiting, isFreshNew, minsRemaining, isPinned, position, customBadge };
             });
 
             // Find single immediate next upcoming market
@@ -1237,8 +1240,10 @@
             const sortedMarkets = processedMarkets.map(m => {
                 let ladderIndex = 100 + m.dynamicOrder;
 
-                if (m.isPinned) {
-                    ladderIndex = -1000 + m.dynamicOrder; // Pin to Top priority set by Admin!
+                if (m.position && m.position > 0) {
+                    ladderIndex = -1000 + m.position; // Exact Position 1, 2, 3 set by Admin!
+                } else if (m.isPinned) {
+                    ladderIndex = -1000 + m.dynamicOrder; // Pin to Top fallback priority
                 } else if (m.isFreshNew) {
                     ladderIndex = -100; // Position #1 Top Priority for fresh result!
                 } else if (m.dynamicOrder === activeOrder) {
@@ -1275,8 +1280,6 @@
                     else if (sUpper.includes('JACKPOT')) labelClass = 'bg-yellow-500 text-black font-black animate-bounce';
 
                     badgeHtml = `<span class="${labelClass} text-white text-[8px] sm:text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">${m.status}</span>`;
-                } else if (m.isPinned) {
-                    badgeHtml = `<span class="bg-indigo-600 text-white text-[8px] sm:text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">📌 TOP</span>`;
                 }
 
                 let todayDisplay = '<span class="text-gray-300 font-black">XX</span>';
@@ -1314,14 +1317,13 @@
                 }
 
                 const marketTitleName = (DEFAULT_MARKETS.find(def => def.id === m.id) || m).name;
-                const pinIndicator = m.isPinned ? `<span class="text-xs" title="Top Pinned Market">📌</span>` : '';
 
                 container.innerHTML += `
                 <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
                             ${badgeHtml}
-                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${pinIndicator}${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
+                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
                         </div>
                         <div class="text-[10px] font-bold text-gray-400 uppercase">${m.time}</div>
                     </div>
