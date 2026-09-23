@@ -853,6 +853,8 @@
                 let name = m.name;
                 let time = m.time;
                 let resTime = m.resTime;
+                let isPinned = false;
+                let badge = 'AUTO';
 
                 // Hard-fix static names to prevent any Firebase inversion/swap
                 if (m.id === 'SG') name = 'SHREE GANESH';
@@ -862,9 +864,11 @@
                 if (cloudData[m.id]) {
                     time = cloudData[m.id].time || m.time;
                     resTime = cloudData[m.id].resTime || m.resTime;
+                    isPinned = cloudData[m.id].isPinned || false;
+                    badge = cloudData[m.id].badge || 'AUTO';
                 }
 
-                return { ...m, name, time, resTime };
+                return { ...m, name, time, resTime, isPinned, badge };
             }).sort((a, b) => a.order - b.order);
             renderResults();
         });
@@ -1143,7 +1147,10 @@
 
             // 1. Calculate market statuses & find active waiting market
             const processedMarkets = marketsWithDynamicOrder.map(m => {
-                let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
+                let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false, isPinned: false, badge: 'AUTO' };
+
+                const isPinned = (m.isPinned !== undefined && m.isPinned) || data.isPinned || false;
+                const customBadge = (m.badge && m.badge !== 'AUTO' ? m.badge : (data.badge && data.badge !== 'AUTO' ? data.badge : 'AUTO'));
 
                 // Check if data.updatedAt was published on TODAY's IST date
                 const updatedIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
@@ -1189,7 +1196,7 @@
                     isFreshNew
                 };
 
-                return { ...m, data: dataWithFallback, isWaiting, isFreshNew, minsRemaining };
+                return { ...m, data: dataWithFallback, isWaiting, isFreshNew, minsRemaining, isPinned, customBadge };
             });
 
             // Find single immediate next upcoming market
@@ -1197,7 +1204,13 @@
             const immediateNextId = upcomingList.length > 0 ? upcomingList[0].id : null;
 
             processedMarkets.forEach(m => {
-                if (m.isFreshNew) {
+                if (m.customBadge && m.customBadge !== 'AUTO') {
+                    if (m.customBadge === 'NONE') {
+                        m.status = '';
+                    } else {
+                        m.status = m.customBadge;
+                    }
+                } else if (m.isFreshNew) {
                     m.status = 'NEW ⚡';
                 } else if (m.isWaiting) {
                     m.status = 'WAITING ⏳';
@@ -1224,7 +1237,9 @@
             const sortedMarkets = processedMarkets.map(m => {
                 let ladderIndex = 100 + m.dynamicOrder;
 
-                if (m.isFreshNew) {
+                if (m.isPinned) {
+                    ladderIndex = -1000 + m.dynamicOrder; // Pin to Top priority set by Admin!
+                } else if (m.isFreshNew) {
                     ladderIndex = -100; // Position #1 Top Priority for fresh result!
                 } else if (m.dynamicOrder === activeOrder) {
                     ladderIndex = 1; // Position #1 Top!
@@ -1251,12 +1266,17 @@
 
                 let badgeHtml = '';
                 if (m.status) {
-                    let labelClass = 'bg-blue-600';
-                    if (m.status === 'NEW ⚡') labelClass = 'bg-emerald-600 animate-bounce';
-                    else if (m.status === 'WAITING ⏳') labelClass = 'bg-red-600 animate-blink';
-                    else if (m.status === 'NEXT') labelClass = 'bg-amber-500 animate-pulse';
+                    let labelClass = 'bg-blue-600 animate-pulse';
+                    const sUpper = m.status.toUpperCase();
+                    if (sUpper.includes('NEW')) labelClass = 'bg-emerald-600 animate-bounce';
+                    else if (sUpper.includes('WAIT') || sUpper.includes('LIVE')) labelClass = 'bg-red-600 animate-blink';
+                    else if (sUpper.includes('NEXT')) labelClass = 'bg-amber-500 animate-pulse';
+                    else if (sUpper.includes('LEAK') || sUpper.includes('HOT') || sUpper.includes('FIRE')) labelClass = 'bg-purple-600 animate-blink';
+                    else if (sUpper.includes('JACKPOT')) labelClass = 'bg-yellow-500 text-black font-black animate-bounce';
 
-                    badgeHtml = `<span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>`;
+                    badgeHtml = `<span class="${labelClass} text-white text-[8px] sm:text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">${m.status}</span>`;
+                } else if (m.isPinned) {
+                    badgeHtml = `<span class="bg-indigo-600 text-white text-[8px] sm:text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">📌 TOP</span>`;
                 }
 
                 let todayDisplay = '<span class="text-gray-300 font-black">XX</span>';
@@ -1294,13 +1314,14 @@
                 }
 
                 const marketTitleName = (DEFAULT_MARKETS.find(def => def.id === m.id) || m).name;
+                const pinIndicator = m.isPinned ? `<span class="text-xs" title="Top Pinned Market">📌</span>` : '';
 
                 container.innerHTML += `
                 <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
                             ${badgeHtml}
-                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
+                            <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${pinIndicator}${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
                         </div>
                         <div class="text-[10px] font-bold text-gray-400 uppercase">${m.time}</div>
                     </div>
@@ -2371,9 +2392,12 @@
                 }
 
                 const mDef = DEFAULT_MARKETS.find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || { id: singleMarketId, name: singleMarketId, time: '' };
-                const marketTitleName = mDef.name;
+                const cloudMarket = (MARKET_LIST || []).find(item => item.id.toUpperCase() === singleMarketId.toUpperCase()) || {};
+                const marketTitleName = cloudMarket.name || mDef.name;
 
                 const data = appData[mDef.id] || { today: 'XX', yesterday: '---', live: false };
+                const badgeSetting = cloudMarket.badge || data.badge || 'AUTO';
+
                 const todayIST = SattaDateEngine.getTodayIST();
                 const yestIST = SattaDateEngine.getYesterdayIST();
 
@@ -2402,7 +2426,7 @@
                     }
                 }
 
-                const resM = getResMinutes(mDef.time || mDef.resTime);
+                const resM = getResMinutes(mDef.time || mDef.resTime || cloudMarket.time || cloudMarket.resTime);
                 const isTimeReached = curTotalM >= resM;
                 const hasExplicitResult = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
@@ -2424,17 +2448,46 @@
                     statusColor = "text-red-600 animate-pulse";
                 }
 
+                // Animated/Blinking badge tags for single result card
+                let customBadgeHtml = '';
+                if (badgeSetting && badgeSetting !== 'AUTO' && badgeSetting !== 'NONE') {
+                    let bClass = 'bg-blue-600 animate-pulse';
+                    const bUpper = badgeSetting.toUpperCase();
+                    if (bUpper.includes('NEW')) bClass = 'bg-emerald-600 animate-bounce';
+                    else if (bUpper.includes('LIVE') || bUpper.includes('WAIT')) bClass = 'bg-red-600 animate-blink';
+                    else if (bUpper.includes('NEXT')) bClass = 'bg-amber-500 animate-pulse';
+                    else if (bUpper.includes('LEAK') || bUpper.includes('HOT') || bUpper.includes('FIRE')) bClass = 'bg-purple-600 animate-blink';
+                    else if (bUpper.includes('JACKPOT')) bClass = 'bg-yellow-500 text-black font-black animate-bounce';
+
+                    customBadgeHtml = `
+                        <div class="inline-flex items-center gap-1.5 ${bClass} text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
+                            <span>${badgeSetting}</span>
+                        </div>`;
+                } else if (data.live || isTimeReached) {
+                    customBadgeHtml = `
+                        <div class="inline-flex items-center gap-1.5 bg-red-600 animate-blink text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
+                            <span>LIVE NOW ⚡</span>
+                        </div>`;
+                } else if (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '') {
+                    customBadgeHtml = `
+                        <div class="inline-flex items-center gap-1.5 bg-emerald-600 animate-bounce text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
+                            <span>NEW RESULT ⚡</span>
+                        </div>`;
+                }
+
                 singleContainer.innerHTML = `
                     <div class="bg-white border-4 border-blue-600 rounded-3xl shadow-2xl overflow-hidden p-6 text-center">
+                        ${customBadgeHtml}
                         <div class="bg-blue-600 text-white font-black text-sm md:text-base py-2.5 px-4 rounded-xl uppercase tracking-widest mb-6">
                             ${marketTitleName} LIVE RESULT ⚡
                         </div>
                         <h1 class="text-4xl md:text-5xl font-black text-blue-900 mb-2 uppercase">${marketTitleName}</h1>
-                        <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${mDef.time || ''}</span></p>
+                        <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${mDef.time || cloudMarket.time || ''}</span></p>
 
-                        <div class="bg-blue-50 border border-blue-100 p-8 rounded-2xl my-6">
+                        <div class="bg-blue-50 border border-blue-100 p-8 rounded-2xl my-6 relative overflow-hidden">
+                            ${(data.live || statusText.includes('LIVE') || (badgeSetting && badgeSetting.toUpperCase().includes('LIVE'))) ? '<div class="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-blink uppercase">LIVE ⚡</div>' : ''}
                             <div class="text-xs font-bold text-gray-500 uppercase mb-1">TODAY RESULT (${curD}-${curM}-${curY})</div>
-                            <div class="text-8xl md:text-9xl font-black ${todayVal === 'XX' ? 'text-gray-300' : 'text-red-600'} drop-shadow-md">${todayVal}</div>
+                            <div class="text-8xl md:text-9xl font-black ${todayVal === 'XX' ? 'text-gray-300' : 'text-red-600'} drop-shadow-md ${data.live ? 'animate-blink' : ''}">${todayVal}</div>
                         </div>
 
                         <div class="flex justify-around items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
