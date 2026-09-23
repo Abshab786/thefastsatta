@@ -1146,7 +1146,7 @@
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
 
                 const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
-                const yesterdayVal = fallbackYesterday || (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' ? data.yesterday : '---');
+                const yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (fallbackYesterday || '---');
 
                 const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
@@ -1560,9 +1560,13 @@
                         group1.forEach(m => {
                             let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
                             if (!resVal || resVal === "") {
-                                resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
+                                if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                                    resVal = "XX";
+                                } else {
+                                    resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
+                                }
                             }
-                            table1Html += `<td class="py-2 px-1 font-black text-blue-900 text-center">${resVal || 'XX'}</td>`;
+                            table1Html += `<td class="py-2 px-1 font-black ${resVal === 'XX' ? 'text-gray-300 font-bold' : 'text-blue-900'} text-center">${resVal || 'XX'}</td>`;
                         });
                         table1Html += `</tr>`;
                     }
@@ -1590,9 +1594,13 @@
                         group2.forEach(m => {
                             let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
                             if (!resVal || resVal === "") {
-                                resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
+                                if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                                    resVal = "XX";
+                                } else {
+                                    resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
+                                }
                             }
-                            table2Html += `<td class="py-2 px-1 font-black text-blue-900 text-center">${resVal || 'XX'}</td>`;
+                            table2Html += `<td class="py-2 px-1 font-black ${resVal === 'XX' ? 'text-gray-300 font-bold' : 'text-blue-900'} text-center">${resVal || 'XX'}</td>`;
                         });
                         table2Html += `</tr>`;
                     }
@@ -2354,9 +2362,9 @@
                 const yestM = yestIST.monthStr;
                 const yestD = yestIST.dayStr;
 
-                // Yesterday's Result: ALWAYS strictly read from Yesterday's historical record!
+                // Yesterday's Result: READ ADMIN'S SAVED YESTERDAY RESULT FIRST!
                 const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, mDef.id);
-                const yestVal = fallbackYesterday || '---';
+                const yestVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (fallbackYesterday || '---');
 
                 const resM = getResMinutes(mDef.time || mDef.resTime);
                 const isTimeReached = curTotalM >= resM;
