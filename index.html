@@ -1145,12 +1145,25 @@
             const processedMarkets = marketsWithDynamicOrder.map(m => {
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false };
 
-                const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, m.id);
-                const yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (fallbackYesterday || '---');
+                // Check if data.updatedAt was published on TODAY's IST date
+                const updatedIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
+                const isUpdatedToday = (updatedIST.yearStr === curY && updatedIST.monthStr === curM && updatedIST.dayStr === curD);
+
+                // If data.today was published on a previous date, that value is actually YESTERDAY'S result!
+                let yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : '';
+                if (!yesterdayVal || yesterdayVal === '---') {
+                    if (!isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---') {
+                        yesterdayVal = data.today;
+                    } else {
+                        yesterdayVal = getDeterministicResult(yestY, yestM, yestD, m.id) || '---';
+                    }
+                }
 
                 const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
-                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+
+                // Today result is ONLY explicit if updated TODAY in IST!
+                const hasExplicitResult = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let minsRemaining = resM - curTotalM;
 
@@ -1176,24 +1189,30 @@
                     isFreshNew
                 };
 
-                let status = 'NEXT';
-                if (isFreshNew) {
-                    status = 'NEW ⚡';
-                } else if (isWaiting) {
-                    status = 'WAITING ⏳';
-                } else if (hasExplicitResult) {
-                    status = 'REST';
-                }
-
-                return { ...m, data: dataWithFallback, status, isWaiting, isFreshNew, minsRemaining };
+                return { ...m, data: dataWithFallback, isWaiting, isFreshNew, minsRemaining };
             });
 
-            // Find the active market (fresh result OR waiting market)
+            // Find single immediate next upcoming market
+            const upcomingList = [...processedMarkets].filter(m => !m.data.hasExplicitResult && !m.isWaiting && m.minsRemaining > 0).sort((a, b) => a.minsRemaining - b.minsRemaining);
+            const immediateNextId = upcomingList.length > 0 ? upcomingList[0].id : null;
+
+            processedMarkets.forEach(m => {
+                if (m.isFreshNew) {
+                    m.status = 'NEW ⚡';
+                } else if (m.isWaiting) {
+                    m.status = 'WAITING ⏳';
+                } else if (m.id === immediateNextId) {
+                    m.status = 'NEXT'; // ONLY 1 market gets NEXT!
+                } else {
+                    m.status = ''; // Clean empty: No UPCOMING, No DECLARED, No REST!
+                }
+            });
+
+            // Find active market for ladder sorting
             let activeMarket = processedMarkets.find(m => m.isFreshNew || m.isWaiting);
             if (!activeMarket) {
-                const upcomingMarkets = [...processedMarkets].filter(m => !m.data.hasExplicitResult && m.minsRemaining > 0).sort((a, b) => a.minsRemaining - b.minsRemaining);
-                if (upcomingMarkets.length > 0) {
-                    activeMarket = upcomingMarkets[0];
+                if (upcomingList.length > 0) {
+                    activeMarket = upcomingList[0];
                 } else {
                     activeMarket = processedMarkets[processedMarkets.length - 1];
                 }
@@ -1230,7 +1249,15 @@
                     latestEntry = { name: m.name, today: data.today, live: data.live, updatedAt: data.updatedAt, showInstantly: data.showInstantly };
                 }
 
-                let labelClass = isFreshNew ? 'bg-emerald-600 animate-bounce' : (isWaiting ? 'bg-red-600 animate-blink' : (m.status === 'REST' ? 'bg-gray-500' : 'bg-amber-500'));
+                let badgeHtml = '';
+                if (m.status) {
+                    let labelClass = 'bg-blue-600';
+                    if (m.status === 'NEW ⚡') labelClass = 'bg-emerald-600 animate-bounce';
+                    else if (m.status === 'WAITING ⏳') labelClass = 'bg-red-600 animate-blink';
+                    else if (m.status === 'NEXT') labelClass = 'bg-amber-500 animate-pulse';
+
+                    badgeHtml = `<span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>`;
+                }
 
                 let todayDisplay = '<span class="text-gray-300 font-black">XX</span>';
                 if (isWaiting) {
@@ -1272,7 +1299,7 @@
                 <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center gap-2">
-                            <span class="${labelClass} text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">${m.status}</span>
+                            ${badgeHtml}
                             <h3 class="text-sm font-black text-gray-800 uppercase flex items-center gap-1.5">${marketTitleName} <span class="text-[9px] text-blue-600 font-bold hover:underline">➔ View Record</span></h3>
                         </div>
                         <div class="text-[10px] font-bold text-gray-400 uppercase">${m.time}</div>
@@ -2362,13 +2389,22 @@
                 const yestM = yestIST.monthStr;
                 const yestD = yestIST.dayStr;
 
-                // Yesterday's Result: READ ADMIN'S SAVED YESTERDAY RESULT FIRST!
-                const fallbackYesterday = getDeterministicResult(yestY, yestM, yestD, mDef.id);
-                const yestVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (fallbackYesterday || '---');
+                // Check if data.updatedAt was published on TODAY's IST date
+                const updatedIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
+                const isUpdatedToday = (updatedIST.yearStr === curY && updatedIST.monthStr === curM && updatedIST.dayStr === curD);
+
+                let yestVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : '';
+                if (!yestVal || yestVal === '---') {
+                    if (!isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---') {
+                        yestVal = data.today;
+                    } else {
+                        yestVal = getDeterministicResult(yestY, yestM, yestD, mDef.id) || '---';
+                    }
+                }
 
                 const resM = getResMinutes(mDef.time || mDef.resTime);
                 const isTimeReached = curTotalM >= resM;
-                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                const hasExplicitResult = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 // SHOW INSTANTLY or TIME REACHED check
                 const canShowNumber = data.showInstantly || isTimeReached || (!data.live && hasExplicitResult);
