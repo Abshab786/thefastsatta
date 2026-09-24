@@ -322,7 +322,7 @@
                 <p class="text-xs md:text-sm font-black text-gray-700 mt-1 uppercase tracking-tight">
                     The Fast Satta (Thefastsatta) ⚡ Sabse Tej Fast Satta Result & Live Satta Result Today
                 </p>
-                <div id="live-clock" class="text-xs md:text-sm font-bold text-gray-500 mt-2 uppercase tracking-widest">25 Aug 2026 | 07:46:54 AM</div>
+                <div id="live-clock" class="text-xs md:text-sm font-bold text-gray-500 mt-2 uppercase tracking-widest">LIVE IST CLOCK</div>
 
                 <div class="marquee bg-gray-100 text-red-600 text-[10px] md:text-xs font-bold py-2 mt-4 rounded-full">
                     <span>दिसावर, फरीदाबाद, गाजियाबाद और गली का सबसे तेज़ रिजल्ट यहीं मिलेगा। गेम खेलें अपने रिस्क पर।</span>
@@ -985,6 +985,8 @@
 
                 appData = cloudData;
                 renderResults();
+                if (typeof renderChart === 'function') renderChart();
+                if (typeof checkSingleMarketMode === 'function') checkSingleMarketMode();
             }
         });
 
@@ -992,6 +994,9 @@
         db.ref('settings').on('value', (snapshot) => {
             const settings = snapshot.val() || {};
             applySettings(settings);
+            if (typeof renderResults === 'function') renderResults();
+            if (typeof renderChart === 'function') renderChart();
+            if (typeof checkSingleMarketMode === 'function') checkSingleMarketMode();
         });
 
         function applySettings(settings) {
@@ -1151,9 +1156,15 @@
             const processedMarkets = marketsWithDynamicOrder.map(m => {
                 let data = appData[m.id] || { today: 'XX', yesterday: '---', live: false, updatedAt: 0, showInstantly: false, isPinned: false, position: 0, badge: 'AUTO' };
 
-                const position = parseInt(m.position !== undefined && m.position > 0 ? m.position : (data.position || 0), 10) || 0;
-                const isPinned = (position > 0) || (m.isPinned !== undefined && m.isPinned) || data.isPinned || false;
-                const customBadge = (m.badge && m.badge !== 'AUTO' ? m.badge : (data.badge && data.badge !== 'AUTO' ? data.badge : 'AUTO'));
+                const position = parseInt(
+                    (data.position !== undefined && data.position > 0) ? data.position :
+                    (m.position !== undefined && m.position > 0) ? m.position : 0, 10
+                ) || 0;
+
+                const isPinned = (position > 0) || (data.isPinned !== undefined && data.isPinned) || (m.isPinned !== undefined && m.isPinned) || false;
+
+                const customBadge = (data.badge && data.badge !== 'AUTO') ? data.badge :
+                                    (m.badge && m.badge !== 'AUTO') ? m.badge : 'AUTO';
 
                 // Calculate difference in calendar days between Today (IST) and updatedAt (IST)
                 const pubIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
@@ -1182,15 +1193,14 @@
                 const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
 
-                // Today result is ONLY explicit if updated TODAY in IST!
-                const hasExplicitResult = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                // Today result is explicit if data.today has a published result number
+                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let minsRemaining = resM - curTotalM;
 
-                // WAITING Logic: Active 60 minutes before result time OR when result time has reached/passed today (until admin publishes result)
-                const isWaiting = !data.showInstantly && (
-                    data.live ||
-                    (!hasExplicitResult && (minsRemaining <= 60 || isTimeReached))
+                // WAITING Logic: Active ONLY if result is NOT YET declared!
+                const isWaiting = !hasExplicitResult && !data.showInstantly && (
+                    data.live === true || (!hasExplicitResult && (minsRemaining <= 60 || isTimeReached) && daysDiff === 0)
                 );
 
                 // Fresh New Result: Keeps 'NEW ⚡' badge UNTIL the next market's result is published!
@@ -1217,15 +1227,23 @@
             const immediateNextId = upcomingList.length > 0 ? upcomingList[0].id : null;
 
             processedMarkets.forEach(m => {
-                if (m.customBadge && m.customBadge !== 'AUTO') {
-                    if (m.customBadge === 'NONE') {
+                const hasResult = m.data.hasExplicitResult;
+                let activeBadge = m.customBadge;
+
+                // If result is DECLARED, clean up any stale LIVE badge!
+                if (hasResult && activeBadge && activeBadge.toUpperCase().includes('LIVE')) {
+                    activeBadge = 'AUTO';
+                }
+
+                if (activeBadge && activeBadge !== 'AUTO') {
+                    if (activeBadge === 'NONE') {
                         m.status = '';
                     } else {
-                        m.status = m.customBadge;
+                        m.status = activeBadge;
                     }
                 } else if (m.isFreshNew) {
                     m.status = 'NEW ⚡';
-                } else if (m.isWaiting) {
+                } else if (m.isWaiting && !hasResult) {
                     m.status = 'WAITING ⏳';
                 } else if (m.id === immediateNextId) {
                     m.status = 'NEXT'; // ONLY 1 market gets NEXT!
@@ -1326,7 +1344,7 @@
                     cardBgClass = 'bg-red-50/50 border-b border-gray-100';
                 }
 
-                const marketTitleName = (DEFAULT_MARKETS.find(def => def.id === m.id) || m).name;
+                const marketTitleName = m.name || (DEFAULT_MARKETS.find(def => def.id === m.id) || m).name;
 
                 container.innerHTML += `
                 <div onclick="openSingleMarketResult('${m.id}')" class="p-4 ${cardBgClass} last:border-0 hover:bg-amber-200/50 cursor-pointer transition-all">
@@ -1721,9 +1739,13 @@
             const localMonthData = (REAL_PRIMARY_MARKET_DATA[selectedYear] && REAL_PRIMARY_MARKET_DATA[selectedYear][selectedMonth]) ? REAL_PRIMARY_MARKET_DATA[selectedYear][selectedMonth] : {};
             drawChartTables(localMonthData);
 
-            // Fetch background update from Firebase
+            // Fetch background update from Firebase in real-time
             if (typeof db !== 'undefined' && db) {
-                db.ref(`charts/${selectedYear}/${selectedMonth}`).once('value', (snap) => {
+                if (window.activeChartRef) {
+                    window.activeChartRef.off();
+                }
+                window.activeChartRef = db.ref(`charts/${selectedYear}/${selectedMonth}`);
+                window.activeChartRef.on('value', (snap) => {
                     const monthData = snap.val() || localMonthData;
                     drawChartTables(monthData);
                 });
@@ -2361,10 +2383,15 @@
         });
 
         // Live Clock
-        setInterval(() => {
-            const now = new Date();
-            document.getElementById('live-clock').innerText = now.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true }).replace(/,/g, ' |');
-        }, 1000);
+        function updateLiveClock() {
+            const clockEl = document.getElementById('live-clock');
+            if (clockEl) {
+                const now = new Date();
+                clockEl.innerText = now.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true }).replace(/,/g, ' |');
+            }
+        }
+        updateLiveClock(); // Run immediately on 0ms!
+        setInterval(updateLiveClock, 1000);
 
         function generateLuckyNum() {
             const input = document.getElementById('calc-input').value;
@@ -2450,31 +2477,51 @@
 
                 const resM = getResMinutes(mDef.time || mDef.resTime || cloudMarket.time || cloudMarket.resTime);
                 const isTimeReached = curTotalM >= resM;
-                const hasExplicitResult = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
-                // SHOW INSTANTLY or TIME REACHED check
-                const canShowNumber = data.showInstantly || isTimeReached || (!data.live && hasExplicitResult);
+                // Today result is explicit if data.today has a published result number
+                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let todayVal = 'XX';
-                if (canShowNumber && hasExplicitResult) {
+                if (hasExplicitResult) {
                     todayVal = data.today;
+                }
+
+                const isResultDeclared = (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '');
+
+                // Active LIVE state: ONLY if result is NOT YET declared!
+                const isMarketLiveNow = !isResultDeclared && (data.live === true || (!hasExplicitResult && isTimeReached && daysDiff === 0));
+
+                // Clean up stale LIVE badge if result is already declared!
+                let activeBadgeSetting = badgeSetting;
+                if (isResultDeclared && activeBadgeSetting && activeBadgeSetting.toUpperCase().includes('LIVE')) {
+                    activeBadgeSetting = 'AUTO';
                 }
 
                 let statusText = "WAITING ⏳";
                 let statusColor = "text-amber-500";
-                if (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '') {
-                    statusText = "DECLARED";
+
+                if (isResultDeclared) {
+                    statusText = "RESULT DECLARED ✅";
                     statusColor = "text-emerald-600";
-                } else if (data.live || isTimeReached) {
+                } else if (isMarketLiveNow) {
                     statusText = "LIVE WAIT... ⏳";
                     statusColor = "text-red-600 animate-pulse";
+                } else if (!isTimeReached) {
+                    const minsRemaining = resM - curTotalM;
+                    if (minsRemaining <= 60 && minsRemaining > 0) {
+                        statusText = `UPCOMING IN ${minsRemaining} MINS ⏳`;
+                        statusColor = "text-amber-600 animate-pulse";
+                    } else {
+                        statusText = "RESULT PENDING ⏳";
+                        statusColor = "text-gray-500";
+                    }
                 }
 
                 // Animated/Blinking badge tags for single result card
                 let customBadgeHtml = '';
-                if (badgeSetting && badgeSetting !== 'AUTO' && badgeSetting !== 'NONE') {
+                if (activeBadgeSetting && activeBadgeSetting !== 'AUTO' && activeBadgeSetting !== 'NONE') {
                     let bClass = 'bg-blue-600 animate-pulse';
-                    const bUpper = badgeSetting.toUpperCase();
+                    const bUpper = activeBadgeSetting.toUpperCase();
                     if (bUpper.includes('NEW')) bClass = 'bg-emerald-600 animate-bounce';
                     else if (bUpper.includes('LIVE') || bUpper.includes('WAIT')) bClass = 'bg-red-600 animate-blink';
                     else if (bUpper.includes('NEXT')) bClass = 'bg-amber-500 animate-pulse';
@@ -2483,33 +2530,40 @@
 
                     customBadgeHtml = `
                         <div class="inline-flex items-center gap-1.5 ${bClass} text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
-                            <span>${badgeSetting}</span>
+                            <span>${activeBadgeSetting}</span>
                         </div>`;
-                } else if (data.live || isTimeReached) {
+                } else if (isMarketLiveNow) {
                     customBadgeHtml = `
                         <div class="inline-flex items-center gap-1.5 bg-red-600 animate-blink text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
                             <span>LIVE NOW ⚡</span>
                         </div>`;
-                } else if (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '') {
+                } else if (isResultDeclared) {
                     customBadgeHtml = `
                         <div class="inline-flex items-center gap-1.5 bg-emerald-600 animate-bounce text-white font-black text-xs md:text-sm px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg mb-3">
                             <span>NEW RESULT ⚡</span>
                         </div>`;
                 }
 
+                let headerBannerText = `${marketTitleName} TODAY RESULT ⚡`;
+                if (isMarketLiveNow) {
+                    headerBannerText = `${marketTitleName} LIVE RESULT ⚡`;
+                } else if (isResultDeclared) {
+                    headerBannerText = `${marketTitleName} DECLARED RESULT ✅`;
+                }
+
                 singleContainer.innerHTML = `
                     <div class="bg-white border-4 border-blue-600 rounded-3xl shadow-2xl overflow-hidden p-6 text-center">
                         ${customBadgeHtml}
                         <div class="bg-blue-600 text-white font-black text-sm md:text-base py-2.5 px-4 rounded-xl uppercase tracking-widest mb-6">
-                            ${marketTitleName} LIVE RESULT ⚡
+                            ${headerBannerText}
                         </div>
                         <h1 class="text-4xl md:text-5xl font-black text-blue-900 mb-2 uppercase">${marketTitleName}</h1>
                         <p class="text-xs font-bold text-gray-400 mb-6">RESULT DECLARATION TIME: <span class="text-blue-600 font-black">${mDef.time || cloudMarket.time || ''}</span></p>
 
                         <div class="bg-blue-50 border border-blue-100 p-8 rounded-2xl my-6 relative overflow-hidden">
-                            ${(data.live || statusText.includes('LIVE') || (badgeSetting && badgeSetting.toUpperCase().includes('LIVE'))) ? '<div class="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-blink uppercase">LIVE ⚡</div>' : ''}
+                            ${isMarketLiveNow ? '<div class="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-blink uppercase">LIVE ⚡</div>' : ''}
                             <div class="text-xs font-bold text-gray-500 uppercase mb-1">TODAY RESULT (${curD}-${curM}-${curY})</div>
-                            <div class="text-8xl md:text-9xl font-black ${todayVal === 'XX' ? 'text-gray-300' : 'text-red-600'} drop-shadow-md ${data.live ? 'animate-blink' : ''}">${todayVal}</div>
+                            <div class="text-8xl md:text-9xl font-black ${todayVal === 'XX' ? 'text-gray-300' : 'text-red-600'} drop-shadow-md ${isMarketLiveNow ? 'animate-blink' : ''}">${todayVal}</div>
                         </div>
 
                         <div class="flex justify-around items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
@@ -2574,7 +2628,10 @@
             renderResults();
             renderChart();
             renderFAQs();
-            setInterval(renderResults, 5000);
+            setInterval(() => {
+                renderResults();
+                checkSingleMarketMode();
+            }, 3000);
         };
 
         function closeModal() {
