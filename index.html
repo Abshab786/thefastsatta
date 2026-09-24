@@ -1711,7 +1711,11 @@
 
                         let resVal = dayData ? (typeof dayData === 'object' ? dayData[targetM.id] : null) : null;
                         if (!resVal || resVal === "") {
-                            resVal = getDeterministicResult(selectedYear, selectedMonth, day, targetM.id);
+                            if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                                resVal = "XX";
+                            } else {
+                                resVal = getDeterministicResult(selectedYear, selectedMonth, day, targetM.id);
+                            }
                         }
 
                         let statusBadge = '<span class="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 uppercase">Declared</span>';
