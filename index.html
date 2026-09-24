@@ -1193,21 +1193,21 @@
                 const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
 
-                // Today result is explicit if data.today has a published result number
-                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                // Today result is explicit ONLY if updated TODAY in IST (daysDiff === 0)!
+                const hasExplicitResultToday = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let minsRemaining = resM - curTotalM;
 
-                // WAITING Logic: Active ONLY if result is NOT YET declared!
-                const isWaiting = !hasExplicitResult && !data.showInstantly && (
-                    data.live === true || (!hasExplicitResult && (minsRemaining <= 60 || isTimeReached) && daysDiff === 0)
+                // WAITING Logic: Active ONLY if result is NOT YET declared for today!
+                const isWaiting = !hasExplicitResultToday && !data.showInstantly && (
+                    data.live === true || (minsRemaining <= 60 || isTimeReached)
                 );
 
                 // Fresh New Result: Keeps 'NEW ⚡' badge UNTIL the next market's result is published!
-                const isFreshNew = hasExplicitResult && newestDeclaredTimestamp > 0 && (data.updatedAt || 0) === newestDeclaredTimestamp;
+                const isFreshNew = hasExplicitResultToday && newestDeclaredTimestamp > 0 && (data.updatedAt || 0) === newestDeclaredTimestamp;
 
                 let todayVal = 'XX';
-                if (hasExplicitResult) {
+                if (hasExplicitResultToday) {
                     todayVal = data.today;
                 }
 
@@ -1215,7 +1215,7 @@
                     ...data,
                     yesterday: yesterdayVal,
                     today: todayVal,
-                    hasExplicitResult,
+                    hasExplicitResult: hasExplicitResultToday,
                     isFreshNew
                 };
 
@@ -2478,18 +2478,18 @@
                 const resM = getResMinutes(mDef.time || mDef.resTime || cloudMarket.time || cloudMarket.resTime);
                 const isTimeReached = curTotalM >= resM;
 
-                // Today result is explicit if data.today has a published result number
-                const hasExplicitResult = data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                // Today result is explicit ONLY if updated TODAY in IST (daysDiff === 0)!
+                const hasExplicitResultToday = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let todayVal = 'XX';
-                if (hasExplicitResult) {
+                if (hasExplicitResultToday) {
                     todayVal = data.today;
                 }
 
                 const isResultDeclared = (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '');
 
-                // Active LIVE state: ONLY if result is NOT YET declared!
-                const isMarketLiveNow = !isResultDeclared && (data.live === true || (!hasExplicitResult && isTimeReached && daysDiff === 0));
+                // Active LIVE state: ONLY if result is NOT YET declared for today!
+                const isMarketLiveNow = !isResultDeclared && (data.live === true || (!hasExplicitResultToday && isTimeReached && daysDiff === 0));
 
                 // Clean up stale LIVE badge if result is already declared!
                 let activeBadgeSetting = badgeSetting;
