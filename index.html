@@ -1155,18 +1155,28 @@
                 const isPinned = (position > 0) || (m.isPinned !== undefined && m.isPinned) || data.isPinned || false;
                 const customBadge = (m.badge && m.badge !== 'AUTO' ? m.badge : (data.badge && data.badge !== 'AUTO' ? data.badge : 'AUTO'));
 
-                // Check if data.updatedAt was published on TODAY's IST date
-                const updatedIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
-                const isUpdatedToday = (updatedIST.yearStr === curY && updatedIST.monthStr === curM && updatedIST.dayStr === curD);
+                // Calculate difference in calendar days between Today (IST) and updatedAt (IST)
+                const pubIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
+                const curDateUtc = Date.UTC(parseInt(curY, 10), parseInt(curM, 10) - 1, parseInt(curD, 10));
+                const pubDateUtc = Date.UTC(parseInt(pubIST.yearStr, 10), parseInt(pubIST.monthStr, 10) - 1, parseInt(pubIST.dayStr, 10));
+                const daysDiff = (data.updatedAt && data.updatedAt > 0) ? Math.floor((curDateUtc - pubDateUtc) / 86400000) : 999;
 
-                // If data.today was published on a previous date, that value is actually YESTERDAY'S result!
-                let yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : '';
-                if (!yesterdayVal || yesterdayVal === '---') {
-                    if (!isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---') {
+                const isUpdatedToday = (daysDiff === 0);
+
+                // Determine Yesterday's Result based on exact calendar date difference
+                let yesterdayVal = '---';
+                if (daysDiff === 0) {
+                    yesterdayVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (getDeterministicResult(yestY, yestM, yestD, m.id) || '---');
+                } else if (daysDiff === 1) {
+                    if (data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '--') {
                         yesterdayVal = data.today;
+                    } else if (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') {
+                        yesterdayVal = data.yesterday;
                     } else {
                         yesterdayVal = getDeterministicResult(yestY, yestM, yestD, m.id) || '---';
                     }
+                } else {
+                    yesterdayVal = getDeterministicResult(yestY, yestM, yestD, m.id) || '---';
                 }
 
                 const resM = m.resM;
@@ -2415,17 +2425,27 @@
                 const yestM = yestIST.monthStr;
                 const yestD = yestIST.dayStr;
 
-                // Check if data.updatedAt was published on TODAY's IST date
-                const updatedIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
-                const isUpdatedToday = (updatedIST.yearStr === curY && updatedIST.monthStr === curM && updatedIST.dayStr === curD);
+                // Calculate difference in calendar days between Today (IST) and updatedAt (IST)
+                const pubIST = SattaDateEngine.getISTDate(new Date(data.updatedAt || 0));
+                const curDateUtc = Date.UTC(parseInt(curY, 10), parseInt(curM, 10) - 1, parseInt(curD, 10));
+                const pubDateUtc = Date.UTC(parseInt(pubIST.yearStr, 10), parseInt(pubIST.monthStr, 10) - 1, parseInt(pubIST.dayStr, 10));
+                const daysDiff = (data.updatedAt && data.updatedAt > 0) ? Math.floor((curDateUtc - pubDateUtc) / 86400000) : 999;
 
-                let yestVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : '';
-                if (!yestVal || yestVal === '---') {
-                    if (!isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---') {
+                const isUpdatedToday = (daysDiff === 0);
+
+                let yestVal = '---';
+                if (daysDiff === 0) {
+                    yestVal = (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') ? data.yesterday : (getDeterministicResult(yestY, yestM, yestD, mDef.id) || '---');
+                } else if (daysDiff === 1) {
+                    if (data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '--') {
                         yestVal = data.today;
+                    } else if (data.yesterday && data.yesterday !== '---' && data.yesterday !== '--' && data.yesterday !== 'XX') {
+                        yestVal = data.yesterday;
                     } else {
                         yestVal = getDeterministicResult(yestY, yestM, yestD, mDef.id) || '---';
                     }
+                } else {
+                    yestVal = getDeterministicResult(yestY, yestM, yestD, mDef.id) || '---';
                 }
 
                 const resM = getResMinutes(mDef.time || mDef.resTime || cloudMarket.time || cloudMarket.resTime);
