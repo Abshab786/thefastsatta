@@ -1333,13 +1333,10 @@
                         </div>`;
                 }
 
-                const isDesawar = (m.id === 'DS');
                 let cardBgClass = 'bg-white border-b border-gray-100';
                 if (isFreshNew) {
-                    // Light Yellow Card Box Highlight for 30 Minutes!
+                    // Light Yellow Card Box Highlight for the latest published result until next result comes out!
                     cardBgClass = 'bg-amber-100/90 border-2 border-amber-400 shadow-md my-1 rounded-xl';
-                } else if (isDesawar) {
-                    cardBgClass = 'bg-[#FFC107]/20 border-l-4 border-l-amber-500 border-b border-gray-100';
                 } else if (isWaiting) {
                     cardBgClass = 'bg-red-50/50 border-b border-gray-100';
                 }
@@ -1430,13 +1427,18 @@
         (function buildHistoricalData() {
             const markets = ['DB', 'SG', 'FB', 'GZ', 'GL', 'DS'];
             const startYear = 2016;
-            const currentYear = new Date().getFullYear();
+            const now = new Date();
+            const curY = now.getFullYear();
+            const curM = now.getMonth() + 1;
+            const curD = now.getDate();
 
-            for (let y = startYear; y <= currentYear; y++) {
+            for (let y = startYear; y <= curY; y++) {
                 if (!REAL_PRIMARY_MARKET_DATA[y]) {
                     REAL_PRIMARY_MARKET_DATA[y] = {};
                 }
                 for (let m = 1; m <= 12; m++) {
+                    if (y === curY && m > curM) continue; // Skip future months entirely
+
                     const mStr = m.toString().padStart(2, '0');
                     if (!REAL_PRIMARY_MARKET_DATA[y][mStr]) {
                         REAL_PRIMARY_MARKET_DATA[y][mStr] = {};
@@ -1444,6 +1446,11 @@
                     const totalDays = new Date(y, m, 0).getDate();
 
                     for (let d = 1; d <= totalDays; d++) {
+                        // Do NOT pre-fill historical numbers for TODAY or FUTURE days!
+                        if (y === curY && m === curM && d >= curD) {
+                            continue; // Today and future days must ONLY come from live Firebase DB!
+                        }
+
                         const dStr = d.toString().padStart(2, '0');
                         if (!REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]) {
                             REAL_PRIMARY_MARKET_DATA[y][mStr][dStr] = {};
@@ -1504,15 +1511,17 @@
             const m = parseInt(month, 10);
             const d = parseInt(day, 10);
 
+            const curY = parseInt(todayIST.yearStr, 10);
+            const curM = parseInt(todayIST.monthStr, 10);
+            const curD = parseInt(todayIST.dayStr, 10);
+
+            // Future Year / Future Month / Future Day -> ALWAYS BLANK / UNRECORDED ("")!
+            if (y > curY) return "";
+            if (y === curY && m > curM) return "";
+            if (y === curY && m === curM && d > curD) return "";
+
             const mStr = m.toString().padStart(2, '0');
             const dStr = d.toString().padStart(2, '0');
-
-            const dateStr = `${y}-${mStr}-${dStr}`;
-            const todayStr = `${todayIST.yearStr}-${todayIST.monthStr}-${todayIST.dayStr}`;
-
-            if (dateStr > todayStr) {
-                return "XX";
-            }
 
             const totalDays = new Date(y, m, 0).getDate();
             if (d > totalDays) {
@@ -1535,7 +1544,7 @@
                 return "";
             }
 
-            // Fallback for other markets (HK, RB, HN, AK) using Murmur3 PRNG
+            // Fallback for other markets (HK, RB, HN, AK) using Murmur3 PRNG for PAST dates
             let mIdx = 0;
             for (let i = 0; i < mKey.length; i++) {
                 mIdx = (mIdx * 31 + mKey.charCodeAt(i)) & 0xffff;
@@ -1601,13 +1610,27 @@
             // Function to draw chart HTML
             function drawChartTables(monthData) {
                 const curY = parseInt(todayIST.yearStr, 10);
-                const curM = todayIST.monthStr;
+                const curM = parseInt(todayIST.monthStr, 10);
                 const curD = parseInt(todayIST.dayStr, 10);
 
-                const daysInMonth = new Date(parseInt(selectedYear, 10), parseInt(selectedMonth, 10), 0).getDate();
+                const selY = parseInt(selectedYear, 10);
+                const selM = parseInt(selectedMonth, 10);
+
+                // If user selected a future year or future month (e.g. October 2026 when current month is September 2026)
+                if (selY > curY || (selY === curY && selM > curM)) {
+                    container.innerHTML = `
+                        <div class="bg-amber-50 border-2 border-amber-300 p-8 rounded-2xl text-center my-6">
+                            <div class="text-3xl mb-2">⏳</div>
+                            <h3 class="text-lg font-black text-amber-900 uppercase mb-1">FUTURE MONTH - RECORD NOT AVAILABLE YET</h3>
+                            <p class="text-xs font-bold text-amber-700">Records for ${monthNames[monthIdx]} ${selectedYear} will appear as results are published.</p>
+                        </div>`;
+                    return;
+                }
+
+                const daysInMonth = new Date(selY, selM, 0).getDate();
 
                 let maxDayToShow = daysInMonth;
-                if (parseInt(selectedYear, 10) === curY && selectedMonth === curM) {
+                if (selY === curY && selM === curM) {
                     maxDayToShow = Math.min(daysInMonth, curD);
                 }
 
@@ -1644,7 +1667,11 @@
                                     resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
                                 }
                             }
-                            table1Html += `<td class="py-2 px-1 font-black ${resVal === 'XX' ? 'text-gray-300 font-bold' : 'text-blue-900'} text-center">${resVal || 'XX'}</td>`;
+                            const isValXX = (!resVal || resVal === "XX" || resVal === "---" || resVal === "");
+                            const cellVal = isValXX ? "XX" : resVal;
+                            const cellClass = isValXX ? "text-gray-300 font-bold" : "text-blue-900 font-black";
+
+                            table1Html += `<td class="py-2 px-1 ${cellClass} text-center">${cellVal}</td>`;
                         });
                         table1Html += `</tr>`;
                     }
@@ -1678,7 +1705,11 @@
                                     resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
                                 }
                             }
-                            table2Html += `<td class="py-2 px-1 font-black ${resVal === 'XX' ? 'text-gray-300 font-bold' : 'text-blue-900'} text-center">${resVal || 'XX'}</td>`;
+                            const isValXX = (!resVal || resVal === "XX" || resVal === "---" || resVal === "");
+                            const cellVal = isValXX ? "XX" : resVal;
+                            const cellClass = isValXX ? "text-gray-300 font-bold" : "text-blue-900 font-black";
+
+                            table2Html += `<td class="py-2 px-1 ${cellClass} text-center">${cellVal}</td>`;
                         });
                         table2Html += `</tr>`;
                     }
@@ -1717,13 +1748,15 @@
                                 resVal = getDeterministicResult(selectedYear, selectedMonth, day, targetM.id);
                             }
                         }
+                        const isValXX = (!resVal || resVal === "XX" || resVal === "---" || resVal === "");
+                        const cellVal = isValXX ? "XX" : resVal;
 
                         let statusBadge = '<span class="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 uppercase">Declared</span>';
-                        if (resVal === 'XX') {
+                        if (isValXX) {
                             statusBadge = '<span class="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200 uppercase">Waiting</span>';
                         }
 
-                        const numberDisplay = (resVal === 'XX' || resVal === '---') ? `<span class="text-gray-300 font-black">${resVal}</span>` : `<span class="text-xl font-black text-blue-900 bg-blue-50 px-3 py-1 rounded-xl shadow-xs border border-blue-100">${resVal}</span>`;
+                        const numberDisplay = isValXX ? `<span class="text-gray-300 font-bold text-lg">XX</span>` : `<span class="text-xl font-black text-blue-900 bg-blue-50 px-3 py-1 rounded-xl shadow-xs border border-blue-100">${cellVal}</span>`;
 
                         singleTableHtml += `
                             <tr class="divide-x divide-gray-200 hover:bg-blue-50/40 transition">
@@ -2600,10 +2633,41 @@
         }
         setInterval(updateUserCount, 3000);
 
+        function updateMonthSelectOptions() {
+            const todayIST = SattaDateEngine.getTodayIST();
+            const curY = parseInt(todayIST.yearStr, 10);
+            const curM = parseInt(todayIST.monthStr, 10);
+
+            const yearEl = document.getElementById('year');
+            const selY = yearEl ? parseInt(yearEl.value, 10) : curY;
+
+            const monthSelects = ['month', 'md-month'];
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            monthSelects.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const prevVal = el.value || todayIST.monthStr;
+                el.innerHTML = '';
+                for (let m = 1; m <= 12; m++) {
+                    const mVal = m.toString().padStart(2, '0');
+                    // Skip future months for current year!
+                    if (selY === curY && m > curM) {
+                        continue;
+                    }
+                    el.innerHTML += `<option value="${mVal}">${monthNames[m - 1]}</option>`;
+                }
+                if (parseInt(prevVal, 10) <= (selY === curY ? curM : 12)) {
+                    el.value = prevVal;
+                } else {
+                    el.value = todayIST.monthStr;
+                }
+            });
+        }
+
         function initDateSelects() {
-            const today = new Date();
-            const curY = today.getFullYear();
-            const curM = (today.getMonth() + 1).toString().padStart(2, '0');
+            const todayIST = SattaDateEngine.getTodayIST();
+            const curY = parseInt(todayIST.yearStr, 10);
 
             const yearSelects = ['year', 'md-year'];
             yearSelects.forEach(id => {
@@ -2614,13 +2678,13 @@
                     el.innerHTML += `<option value="${y}">${y}</option>`;
                 }
                 el.value = curY.toString();
+                el.addEventListener('change', () => {
+                    updateMonthSelectOptions();
+                    renderChart();
+                });
             });
 
-            const monthSelects = ['month', 'md-month'];
-            monthSelects.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = curM;
-            });
+            updateMonthSelectOptions();
         }
 
         // Initial Load
