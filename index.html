@@ -1484,10 +1484,10 @@
             const curM = parseInt(todayIST.monthStr, 10);
             const curD = parseInt(todayIST.dayStr, 10);
 
-            // Future Year / Future Month / Future Day -> ALWAYS BLANK / UNRECORDED ("")!
+            // Future Year / Future Month / Today or Future Day -> ALWAYS BLANK / UNRECORDED ("")!
             if (y > curY) return "";
             if (y === curY && m > curM) return "";
-            if (y === curY && m === curM && d > curD) return "";
+            if (y === curY && m === curM && d >= curD) return "";
 
             const mStr = m.toString().padStart(2, '0');
             const dStr = d.toString().padStart(2, '0');
