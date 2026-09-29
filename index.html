@@ -1221,21 +1221,13 @@
                 }
             });
 
-            // Find active market for ladder sorting
-            let activeMarket = processedMarkets.find(m => m.isFreshNew || m.isWaiting);
-            if (!activeMarket) {
-                if (upcomingList.length > 0) {
-                    activeMarket = upcomingList[0];
-                } else {
-                    activeMarket = processedMarkets[processedMarkets.length - 1];
-                }
-            }
-
-            const activeOrder = activeMarket ? activeMarket.dynamicOrder : 1;
-
-            // 2. Continuous Dynamic Ladder Sort:
+            // Continuous Dynamic Sorting:
+            // 1. Admin Manual Rank (1-10) or Pin (-1000 + pos)
+            // 2. Fresh New Result (-100)
+            // 3. Upcoming / Waiting Markets (10 + minsRemaining) -> NEXT upcoming result comes RIGHT AT THE TOP!
+            // 4. Already Declared Markets (5000 + dynamicOrder) -> Move below upcoming markets!
             const sortedMarkets = processedMarkets.map(m => {
-                let ladderIndex = 100 + m.dynamicOrder;
+                let ladderIndex = 5000 + m.dynamicOrder;
 
                 if (m.position && m.position > 0) {
                     ladderIndex = -1000 + m.position; // Exact Position 1, 2, 3 set by Admin!
@@ -1243,12 +1235,14 @@
                     ladderIndex = -1000 + m.dynamicOrder; // Pin to Top fallback priority
                 } else if (m.isFreshNew) {
                     ladderIndex = -100; // Position #1 Top Priority for fresh result!
-                } else if (m.dynamicOrder === activeOrder) {
-                    ladderIndex = 1; // Position #1 Top!
-                } else if (m.dynamicOrder < activeOrder) {
-                    ladderIndex = 1 + (activeOrder - m.dynamicOrder); // Shift right behind active market!
+                } else if (!m.data.hasExplicitResult) {
+                    // Upcoming / Waiting Market whose result is NOT YET DECLARED today!
+                    // Sort by upcoming time (minsRemaining) so the NEXT market coming up is at the top!
+                    const remaining = m.minsRemaining > 0 ? m.minsRemaining : (1440 + m.minsRemaining);
+                    ladderIndex = 10 + remaining;
                 } else {
-                    ladderIndex = 100 + (m.dynamicOrder - activeOrder);
+                    // Already declared today
+                    ladderIndex = 5000 + m.dynamicOrder;
                 }
 
                 return { ...m, ladderIndex };
@@ -1630,7 +1624,7 @@
                         group1.forEach(m => {
                             let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
                             if (!resVal || resVal === "") {
-                                if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                                if (parseInt(selectedYear, 10) === curY && parseInt(selectedMonth, 10) === parseInt(curM, 10) && parseInt(day, 10) >= curD) {
                                     resVal = "XX";
                                 } else {
                                     resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
@@ -1668,7 +1662,7 @@
                         group2.forEach(m => {
                             let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
                             if (!resVal || resVal === "") {
-                                if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                                if (parseInt(selectedYear, 10) === curY && parseInt(selectedMonth, 10) === parseInt(curM, 10) && parseInt(day, 10) >= curD) {
                                     resVal = "XX";
                                 } else {
                                     resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
@@ -1711,7 +1705,7 @@
 
                         let resVal = dayData ? (typeof dayData === 'object' ? dayData[targetM.id] : null) : null;
                         if (!resVal || resVal === "") {
-                            if (parseInt(selectedYear, 10) === curY && selectedMonth === curM && parseInt(day, 10) >= curD) {
+                            if (parseInt(selectedYear, 10) === curY && parseInt(selectedMonth, 10) === parseInt(curM, 10) && parseInt(day, 10) >= curD) {
                                 resVal = "XX";
                             } else {
                                 resVal = getDeterministicResult(selectedYear, selectedMonth, day, targetM.id);
