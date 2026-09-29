@@ -1162,8 +1162,9 @@
                 const resM = m.resM;
                 const isTimeReached = curTotalM >= resM;
 
-                // Today result is explicit ONLY if updated TODAY in IST (daysDiff === 0)!
-                const hasExplicitResultToday = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                // Today result is explicit ONLY if updated TODAY in IST AND (not live pending or result time reached or showInstantly)!
+                const isLivePending = data.live === true && !isTimeReached && !data.showInstantly;
+                const hasExplicitResultToday = isUpdatedToday && !isLivePending && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let minsRemaining = resM - curTotalM;
 
@@ -1393,14 +1394,14 @@
             const now = new Date();
             const curY = now.getFullYear();
             const curM = now.getMonth() + 1;
-            const curD = now.getDate();
 
             for (let y = startYear; y <= curY; y++) {
                 if (!REAL_PRIMARY_MARKET_DATA[y]) {
                     REAL_PRIMARY_MARKET_DATA[y] = {};
                 }
                 for (let m = 1; m <= 12; m++) {
-                    if (y === curY && m > curM) continue; // Skip future months entirely
+                    // Skip current month and future months entirely from generating PRNG seed numbers!
+                    if (y === curY && m >= curM) continue;
 
                     const mStr = m.toString().padStart(2, '0');
                     if (!REAL_PRIMARY_MARKET_DATA[y][mStr]) {
@@ -1409,11 +1410,6 @@
                     const totalDays = new Date(y, m, 0).getDate();
 
                     for (let d = 1; d <= totalDays; d++) {
-                        // Do NOT pre-fill historical numbers for TODAY or FUTURE days!
-                        if (y === curY && m === curM && d >= curD) {
-                            continue; // Today and future days must ONLY come from live Firebase DB!
-                        }
-
                         const dStr = d.toString().padStart(2, '0');
                         if (!REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]) {
                             REAL_PRIMARY_MARKET_DATA[y][mStr][dStr] = {};
