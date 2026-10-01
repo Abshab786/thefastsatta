@@ -485,7 +485,7 @@
                         <option value="06">June</option>
                         <option value="07">July</option>
                         <option value="08">August</option>
-                        <option value="09" selected>September</option>
+                        <option value="09">September</option>
                         <option value="10">October</option>
                         <option value="11">November</option>
                         <option value="12">December</option>
@@ -543,7 +543,7 @@
         </main>
 
         <!-- Footer -->
-        <footer class="max-w-5xl mx-auto px-4 py-12 bg-white border-t border-gray-100 mt-12 mb-20">
+        <footer class="max-w-5xl mx-auto px-4 py-8 bg-white border-t border-gray-100 mt-8 mb-0 pb-16">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 mb-10">
                 <button onclick="showLegal('disclaimer')" class="bg-gray-900 text-white py-3 px-2 rounded-xl font-bold text-xs shadow-md hover:bg-black transition-all">Disclaimer</button>
                 <button onclick="showLegal('terms')" class="bg-gray-900 text-white py-3 px-2 rounded-xl font-bold text-xs shadow-md hover:bg-black transition-all">Terms & Conditions</button>
@@ -553,7 +553,7 @@
                 <button onclick="showLegal('contact')" class="bg-gray-900 text-white py-3 px-2 rounded-xl font-bold text-xs shadow-md hover:bg-black transition-all">Contact Us</button>
             </div>
             <div class="text-center">
-                <div class="text-xs font-black text-gray-400 mb-4 tracking-widest uppercase">© 2016 thefastsatta.com All RIGHTS RESERVED.</div>
+                <div class="text-xs font-black text-gray-400 mb-4 tracking-widest uppercase">© 2016-2026 <a href="https://thefastsatta.com/" class="text-blue-600 hover:text-blue-800 underline transition-colors">thefastsatta.com</a> All RIGHTS RESERVED.</div>
                 <div class="p-6 bg-red-50/50 rounded-3xl border border-red-100">
                     <p class="text-[11px] md:text-xs text-red-700 leading-relaxed font-bold italic opacity-80 uppercase">
                         DISCLAIMER: thefastsatta.com is an independent informational portal. We are not affiliated with any gambling organization. The numbers displayed are for entertainment and informative purposes only. Gambling is illegal in many regions; please comply with local laws. Users must be 18 years or older.
@@ -1168,8 +1168,12 @@
 
                 let minsRemaining = resM - curTotalM;
 
-                // WAITING Logic: Active ONLY if result is NOT YET declared for today!
-                const isWaiting = !hasExplicitResultToday && !data.showInstantly && (
+                const totalDaysInCurM = new Date(parseInt(curY, 10), parseInt(curM, 10), 0).getDate();
+                const isTodayLastDayOfMonth = (parseInt(curD, 10) === totalDaysInCurM);
+                const isClosedToday = isTodayLastDayOfMonth && (m.id !== 'DS');
+
+                // WAITING Logic: Active ONLY if result is NOT YET declared for today AND market is NOT closed today!
+                const isWaiting = !isClosedToday && !hasExplicitResultToday && !data.showInstantly && (
                     data.live === true || (minsRemaining <= 60 || isTimeReached)
                 );
 
@@ -1177,7 +1181,9 @@
                 const isFreshNew = hasExplicitResultToday && newestDeclaredTimestamp > 0 && (data.updatedAt || 0) === newestDeclaredTimestamp;
 
                 let todayVal = 'XX';
-                if (hasExplicitResultToday) {
+                if (isClosedToday && !hasExplicitResultToday) {
+                    todayVal = '---';
+                } else if (hasExplicitResultToday) {
                     todayVal = data.today;
                 }
 
@@ -1200,12 +1206,18 @@
                 const hasResult = m.data.hasExplicitResult;
                 let activeBadge = m.customBadge;
 
+                const totalDaysInCurM = new Date(parseInt(curY, 10), parseInt(curM, 10), 0).getDate();
+                const isTodayLastDayOfMonth = (parseInt(curD, 10) === totalDaysInCurM);
+                const isClosedToday = isTodayLastDayOfMonth && (m.id !== 'DS');
+
                 // If result is DECLARED, clean up any stale LIVE badge!
                 if (hasResult && activeBadge && activeBadge.toUpperCase().includes('LIVE')) {
                     activeBadge = 'AUTO';
                 }
 
-                if (activeBadge && activeBadge !== 'AUTO') {
+                if (isClosedToday && !hasResult) {
+                    m.status = 'CLOSED 🛑';
+                } else if (activeBadge && activeBadge !== 'AUTO') {
                     if (activeBadge === 'NONE') {
                         m.status = '';
                     } else {
@@ -1488,6 +1500,12 @@
             }
 
             const mKey = marketId.toUpperCase();
+
+            // Month-End Rule: On the last day of the month, ONLY Desawar (DS) is open! All other 9 markets are CLOSED ("---")!
+            if (d === totalDays && mKey !== 'DS') {
+                return "---";
+            }
+
             const isPrimaryMarket = ['DB', 'SG', 'FB', 'GZ', 'GL', 'DS'].includes(mKey);
 
             // Priority 1: Primary Real Market Data for DB, SG, FB, GZ, GL, DS
@@ -1566,6 +1584,36 @@
                 if (legendBox) legendBox.classList.add('hidden');
             }
 
+            function resolveChartCellVal(mId, day, dayData, selY, selM, curY, curM, curD) {
+                const dayNum = parseInt(day, 10);
+                const isFutureDay = (selY === curY && selM === curM && dayNum > curD);
+
+                if (isFutureDay) return "XX";
+
+                // Month-End Rule: On the last day of the month, ONLY Desawar (DS) is open! All other 9 markets are CLOSED ("---")!
+                const totalDaysInSelM = new Date(selY, selM, 0).getDate();
+                if (dayNum === totalDaysInSelM && mId !== 'DS') {
+                    return "---";
+                }
+
+                // Read directly from Firebase DB charts node for this specific date and market
+                let resVal = dayData ? (typeof dayData === 'object' ? dayData[mId] : null) : null;
+
+                // For current month (e.g. October 2026): ONLY show numbers explicitly uploaded by Admin in Firebase DB charts!
+                if (selY === curY && selM === curM) {
+                    if (resVal && resVal !== 'XX' && resVal !== '---' && resVal !== '' && resVal !== '--') {
+                        return resVal; // Show Admin's published number!
+                    }
+                    return "XX"; // Not published by Admin yet -> ALWAYS XX!
+                }
+
+                // For past months (e.g. September 2026 or earlier): Read charts DB first, then verified historical record
+                if (!resVal || resVal === "" || resVal === "---") {
+                    resVal = getDeterministicResult(selY.toString(), selM.toString().padStart(2, '0'), day, mId);
+                }
+                return (!resVal || resVal === "XX" || resVal === "---" || resVal === "") ? "XX" : resVal;
+            }
+
             // Function to draw chart HTML
             function drawChartTables(monthData) {
                 const curY = parseInt(todayIST.yearStr, 10);
@@ -1618,16 +1666,9 @@
                         table1Html += `<td class="py-2 px-1 font-black text-red-600 bg-red-50 border-r border-gray-300 text-center sticky left-0 bg-white z-0">${day}</td>`;
 
                         group1.forEach(m => {
-                            let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
-                            if (!resVal || resVal === "") {
-                                if (parseInt(selectedYear, 10) === curY && parseInt(selectedMonth, 10) === parseInt(curM, 10) && parseInt(day, 10) >= curD) {
-                                    resVal = "XX";
-                                } else {
-                                    resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
-                                }
-                            }
-                            const isValXX = (!resVal || resVal === "XX" || resVal === "---" || resVal === "");
-                            const cellVal = isValXX ? "XX" : resVal;
+                            const resVal = resolveChartCellVal(m.id, day, dayData, selY, selM, curY, curM, curD);
+                            const isValXX = (!resVal || resVal === "XX" || resVal === "---");
+                            const cellVal = (!resVal || resVal === "XX") ? "XX" : resVal;
                             const cellClass = isValXX ? "text-gray-300 font-bold" : "text-blue-900 font-black";
 
                             table1Html += `<td class="py-2 px-1 ${cellClass} text-center">${cellVal}</td>`;
@@ -1656,16 +1697,9 @@
                         table2Html += `<td class="py-2 px-1 font-black text-red-600 bg-red-50 border-r border-gray-300 text-center sticky left-0 bg-white z-0">${day}</td>`;
 
                         group2.forEach(m => {
-                            let resVal = dayData ? (typeof dayData === 'object' ? dayData[m.id] : null) : null;
-                            if (!resVal || resVal === "") {
-                                if (parseInt(selectedYear, 10) === curY && parseInt(selectedMonth, 10) === parseInt(curM, 10) && parseInt(day, 10) >= curD) {
-                                    resVal = "XX";
-                                } else {
-                                    resVal = getDeterministicResult(selectedYear, selectedMonth, day, m.id);
-                                }
-                            }
-                            const isValXX = (!resVal || resVal === "XX" || resVal === "---" || resVal === "");
-                            const cellVal = isValXX ? "XX" : resVal;
+                            const resVal = resolveChartCellVal(m.id, day, dayData, selY, selM, curY, curM, curD);
+                            const isValXX = (!resVal || resVal === "XX" || resVal === "---");
+                            const cellVal = (!resVal || resVal === "XX") ? "XX" : resVal;
                             const cellClass = isValXX ? "text-gray-300 font-bold" : "text-blue-900 font-black";
 
                             table2Html += `<td class="py-2 px-1 ${cellClass} text-center">${cellVal}</td>`;
@@ -2474,18 +2508,25 @@
                 const resM = getResMinutes(mDef.time || mDef.resTime || cloudMarket.time || cloudMarket.resTime);
                 const isTimeReached = curTotalM >= resM;
 
+                const totalDaysInCurM = new Date(parseInt(curY, 10), parseInt(curM, 10), 0).getDate();
+                const isTodayLastDayOfMonth = (parseInt(curD, 10) === totalDaysInCurM);
+                const isClosedToday = isTodayLastDayOfMonth && (mDef.id !== 'DS');
+
                 // Today result is explicit ONLY if updated TODAY in IST (daysDiff === 0)!
-                const hasExplicitResultToday = isUpdatedToday && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
+                const isLivePending = data.live === true && !isTimeReached && !data.showInstantly;
+                const hasExplicitResultToday = isUpdatedToday && !isLivePending && data.today && data.today !== 'XX' && data.today !== '---' && data.today !== '' && data.today !== '--';
 
                 let todayVal = 'XX';
-                if (hasExplicitResultToday) {
+                if (isClosedToday && !hasExplicitResultToday) {
+                    todayVal = '---';
+                } else if (hasExplicitResultToday) {
                     todayVal = data.today;
                 }
 
                 const isResultDeclared = (todayVal !== 'XX' && todayVal !== '---' && todayVal !== '');
 
-                // Active LIVE state: ONLY if result is NOT YET declared for today!
-                const isMarketLiveNow = !isResultDeclared && (data.live === true || (!hasExplicitResultToday && isTimeReached && daysDiff === 0));
+                // Active LIVE state: ONLY if result is NOT YET declared for today AND market is NOT closed today!
+                const isMarketLiveNow = !isClosedToday && !isResultDeclared && (data.live === true || (!hasExplicitResultToday && isTimeReached && daysDiff === 0));
 
                 // Clean up stale LIVE badge if result is already declared!
                 let activeBadgeSetting = badgeSetting;
@@ -2496,7 +2537,10 @@
                 let statusText = "WAITING ⏳";
                 let statusColor = "text-amber-500";
 
-                if (isResultDeclared) {
+                if (isClosedToday && !isResultDeclared) {
+                    statusText = "MARKET CLOSED 🛑";
+                    statusColor = "text-red-600 font-black";
+                } else if (isResultDeclared) {
                     statusText = "RESULT DECLARED ✅";
                     statusColor = "text-emerald-600";
                 } else if (isMarketLiveNow) {
@@ -2606,7 +2650,7 @@
             monthSelects.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
-                const prevVal = el.value || todayIST.monthStr;
+                const prevVal = el.value;
                 el.innerHTML = '';
                 for (let m = 1; m <= 12; m++) {
                     const mVal = m.toString().padStart(2, '0');
@@ -2616,7 +2660,7 @@
                     }
                     el.innerHTML += `<option value="${mVal}">${monthNames[m - 1]}</option>`;
                 }
-                if (parseInt(prevVal, 10) <= (selY === curY ? curM : 12)) {
+                if (prevVal && parseInt(prevVal, 10) <= (selY === curY ? curM : 12)) {
                     el.value = prevVal;
                 } else {
                     el.value = todayIST.monthStr;
@@ -2641,6 +2685,13 @@
                     updateMonthSelectOptions();
                     renderChart();
                 });
+            });
+
+            // Set month dropdowns directly to current month
+            const monthSelects = ['month', 'md-month'];
+            monthSelects.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = todayIST.monthStr;
             });
 
             updateMonthSelectOptions();
