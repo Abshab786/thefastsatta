@@ -469,6 +469,7 @@
                         <option value="HK">HARYANA KING (01:30 PM)</option>
                         <option value="RB">RAM BAZAR (02:30 PM)</option>
                         <option value="DB">DELHI BAZAR (03:10 PM)</option>
+                        <option value="DN">DELHI NAGAR (04:10 PM)</option>
                         <option value="SG">SHREE GANESH (04:40 PM)</option>
                         <option value="FB">FARIDABAD (06:10 PM)</option>
                         <option value="AK">AMBALA KING (07:30 PM)</option>
@@ -519,6 +520,7 @@
                     <span>HK: HARYANA KING</span> |
                     <span>RB: RAM BAZAR</span> |
                     <span>DB: DELHI BAZAR</span> |
+                    <span>DN: DELHI NAGAR</span> |
                     <span>SG: SHREE GANESH</span> |
                     <span>FB: FARIDABAD</span> |
                     <span>AK: AMBALA KING</span> |
@@ -807,13 +809,14 @@
             { id: 'HK', name: 'HARYANA KING', time: '01:30 PM', resTime: '13:30', order: 1 },
             { id: 'RB', name: 'RAM BAZAR', time: '02:30 PM', resTime: '14:30', order: 2 },
             { id: 'DB', name: 'DELHI BAZAR', time: '03:10 PM', resTime: '15:10', order: 3 },
-            { id: 'SG', name: 'SHREE GANESH', time: '04:40 PM', resTime: '16:40', order: 4 },
-            { id: 'FB', name: 'FARIDABAD', time: '06:10 PM', resTime: '18:10', order: 5 },
-            { id: 'AK', name: 'AMBALA KING', time: '07:30 PM', resTime: '19:30', order: 6 },
-            { id: 'GZ', name: 'GAZIYABAD', time: '10:00 PM', resTime: '22:00', order: 7 },
-            { id: 'HN', name: 'HIMACHAL NIGHT', time: '10:40 PM', resTime: '22:40', order: 8 },
-            { id: 'GL', name: 'GALI', time: '12:00 AM', resTime: '00:00', order: 9 },
-            { id: 'DS', name: 'DISAWAR', time: '05:10 AM', resTime: '05:10', order: 10 }
+            { id: 'DN', name: 'DELHI NAGAR', time: '04:10 PM', resTime: '16:10', order: 4 },
+            { id: 'SG', name: 'SHREE GANESH', time: '04:40 PM', resTime: '16:40', order: 5 },
+            { id: 'FB', name: 'FARIDABAD', time: '06:10 PM', resTime: '18:10', order: 6 },
+            { id: 'AK', name: 'AMBALA KING', time: '07:30 PM', resTime: '19:30', order: 7 },
+            { id: 'GZ', name: 'GAZIYABAD', time: '10:00 PM', resTime: '22:00', order: 8 },
+            { id: 'HN', name: 'HIMACHAL NIGHT', time: '10:40 PM', resTime: '22:40', order: 9 },
+            { id: 'GL', name: 'GALI', time: '12:00 AM', resTime: '00:00', order: 10 },
+            { id: 'DS', name: 'DISAWAR', time: '05:10 AM', resTime: '05:10', order: 11 }
         ];
 
         let MARKET_LIST = [...DEFAULT_MARKETS];
@@ -1112,6 +1115,25 @@
                 return { ...m, resM };
             }).sort((a, b) => a.resM - b.resM).map((m, idx) => ({ ...m, dynamicOrder: idx + 1 }));
 
+            // Auto-sync Delhi Nagar (DN) SAME TO SAME from Disawar (DS)
+            const dsData = appData['DS'] || {};
+            const dnData = appData['DN'] || {};
+            const dsHasToday = dsData.today && dsData.today !== 'XX' && dsData.today !== '---' && dsData.today !== '';
+            const dnHasToday = dnData.today && dnData.today !== 'XX' && dnData.today !== '---' && dnData.today !== '';
+
+            if (dsHasToday || !dnHasToday) {
+                appData['DN'] = {
+                    ...dnData,
+                    name: 'DELHI NAGAR',
+                    time: '04:10 PM',
+                    today: dsData.today || 'XX',
+                    yesterday: dsData.yesterday || dnData.yesterday || '---',
+                    updatedAt: dsData.updatedAt || Date.now(),
+                    live: false,
+                    showInstantly: true
+                };
+            }
+
             // Find max updatedAt timestamp among all declared markets today
             let newestDeclaredTimestamp = 0;
             marketsWithDynamicOrder.forEach(m => {
@@ -1402,7 +1424,7 @@
         };
 
         (function buildHistoricalData() {
-            const markets = ['DB', 'SG', 'FB', 'GZ', 'GL', 'DS'];
+            const markets = ['DB', 'DN', 'SG', 'FB', 'GZ', 'GL', 'DS', 'HK', 'RB', 'AK', 'HN'];
             const startYear = 2016;
             const now = new Date();
             const curY = now.getFullYear();
@@ -1440,6 +1462,11 @@
                                 REAL_PRIMARY_MARKET_DATA[y][mStr][dStr][mKey] = val.toString().padStart(2, '0');
                             }
                         });
+
+                        // Copy Disawar (DS) result SAME TO SAME for Delhi Nagar (DN)!
+                        if (REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]['DS'] !== undefined) {
+                            REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]['DN'] = REAL_PRIMARY_MARKET_DATA[y][mStr][dStr]['DS'];
+                        }
                     }
                 }
             }
@@ -1605,6 +1632,13 @@
                     if (resVal && resVal !== 'XX' && resVal !== '---' && resVal !== '' && resVal !== '--') {
                         return resVal; // Show Admin's published number!
                     }
+                    // Auto-copy Disawar (DS) result into Delhi Nagar (DN) for current month chart
+                    if (mId === 'DN') {
+                        const dsVal = dayData ? (typeof dayData === 'object' ? dayData['DS'] : null) : null;
+                        if (dsVal && dsVal !== 'XX' && dsVal !== '---' && dsVal !== '' && dsVal !== '--') {
+                            return dsVal;
+                        }
+                    }
                     return "XX"; // Not published by Admin yet -> ALWAYS XX!
                 }
 
@@ -1643,9 +1677,9 @@
                 }
 
                 if (selectedMarketFilter === 'ALL') {
-                    // Split 10 markets into Top 5 (HK, RB, DB, SG, FB) + Bottom 5 (AK, GZ, HN, GL, DS)
-                    const group1 = markets.slice(0, 5);
-                    const group2 = markets.slice(5, 10);
+                    // Split 11 markets into Top 6 (HK, RB, DB, DN, SG, FB) + Bottom 5 (AK, GZ, HN, GL, DS)
+                    const group1 = markets.slice(0, 6);
+                    const group2 = markets.slice(6, 11);
 
                     // Table 1 (Top 5 Markets)
                     let table1Html = `
