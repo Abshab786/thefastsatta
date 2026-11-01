@@ -1115,23 +1115,32 @@
                 return { ...m, resM };
             }).sort((a, b) => a.resM - b.resM).map((m, idx) => ({ ...m, dynamicOrder: idx + 1 }));
 
-            // Auto-sync Delhi Nagar (DN) SAME TO SAME from Disawar (DS)
+            // Auto-sync Delhi Nagar (DN) SAME TO SAME from Disawar (DS) if DN is not explicitly published today
             const dsData = appData['DS'] || {};
             const dnData = appData['DN'] || {};
-            const dsHasToday = dsData.today && dsData.today !== 'XX' && dsData.today !== '---' && dsData.today !== '';
-            const dnHasToday = dnData.today && dnData.today !== 'XX' && dnData.today !== '---' && dnData.today !== '';
 
-            if (dsHasToday || !dnHasToday) {
-                appData['DN'] = {
-                    ...dnData,
-                    name: 'DELHI NAGAR',
-                    time: '04:10 PM',
-                    today: dsData.today || 'XX',
-                    yesterday: dsData.yesterday || dnData.yesterday || '---',
-                    updatedAt: dsData.updatedAt || Date.now(),
-                    live: false,
-                    showInstantly: true
-                };
+            const dsPubIST = SattaDateEngine.getISTDate(new Date(dsData.updatedAt || 0));
+            const dnPubIST = SattaDateEngine.getISTDate(new Date(dnData.updatedAt || 0));
+
+            const dsUpdatedToday = (dsData.updatedAt && dsData.updatedAt > 0 && dsPubIST.isoStr === todayIST.isoStr);
+            const dnUpdatedToday = (dnData.updatedAt && dnData.updatedAt > 0 && dnPubIST.isoStr === todayIST.isoStr);
+
+            const dsHasToday = dsUpdatedToday && dsData.today && dsData.today !== 'XX' && dsData.today !== '---' && dsData.today !== '';
+            const dnHasToday = dnUpdatedToday && dnData.today && dnData.today !== 'XX' && dnData.today !== '---' && dnData.today !== '';
+
+            if (!dnHasToday) {
+                if (dsHasToday) {
+                    appData['DN'] = {
+                        ...dnData,
+                        name: 'DELHI NAGAR',
+                        time: '04:10 PM',
+                        today: dsData.today,
+                        yesterday: dsData.yesterday || dnData.yesterday || '---',
+                        updatedAt: dsData.updatedAt,
+                        live: false,
+                        showInstantly: true
+                    };
+                }
             }
 
             // Find max updatedAt timestamp among all declared markets today
